@@ -24,7 +24,7 @@ const kosSchema = new mongoose.Schema(
     },
     area_kampus: {
       type: String,
-      default: 'Sekitar UGM',
+      default: '',
       trim: true,
     },
     koordinat: {
@@ -43,9 +43,7 @@ const kosSchema = new mongoose.Schema(
     },
     foto: {
       type: [String],
-      default: [
-        'https://images.unsplash.com/photo-1522771739844-6a9f6d5f14af?auto=format&fit=crop&w=800&q=80',
-      ],
+      default: [],
     },
     harga_per_bulan: {
       type: Number,
@@ -66,12 +64,12 @@ const kosSchema = new mongoose.Schema(
     },
     luas_kamar: {
       type: String,
-      default: '3x4 meter',
+      default: '',
       trim: true,
     },
     peraturan: {
       type: [String],
-      default: ['Akses 24 jam', 'Dilarang merokok di dalam kamar'],
+      default: [],
     },
     jumlah_kamar_total: {
       type: Number,

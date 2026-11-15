@@ -9,6 +9,7 @@ const adminRoutes = require('./routes/adminRoutes');
 const favoritRoutes = require('./routes/favoritRoutes');
 const inquiryRoutes = require('./routes/inquiryRoutes');
 const { notFound, errorHandler } = require('./middlewares/errorMiddleware');
+const { loadSession, validateCsrf } = require('./middlewares/sessionMiddleware');
 
 const app = express();
 
@@ -16,6 +17,7 @@ const app = express();
 app.use(cors());
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
+app.use('/api', loadSession, validateCsrf);
 
 if (process.env.NODE_ENV !== 'test') {
   app.use(morgan('dev'));
@@ -41,6 +43,8 @@ app.use('/api/kos', kosRoutes);
 app.use('/api/admin', adminRoutes);
 app.use('/api/favorit', favoritRoutes);
 app.use('/api/inquiries', inquiryRoutes);
+app.use('/api/inquiry', inquiryRoutes);
+app.use('/api/notifikasi', require('./routes/notifikasiRoutes'));
 
 // Error Handling Middleware
 app.use(notFound);

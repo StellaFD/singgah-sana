@@ -1,5 +1,6 @@
 const Favorit = require('../models/Favorit');
 const Kos = require('../models/Kos');
+const { formatPublicKos } = require('./kosController');
 
 const getMyFavorites = async (req, res, next) => {
   try {
@@ -8,13 +9,18 @@ const getMyFavorites = async (req, res, next) => {
         path: 'kos_id',
         populate: {
           path: 'pemilik_id',
-          select: 'nama nomor_telepon email',
+          select: 'nama status',
         },
       })
       .sort({ createdAt: -1 });
 
     // Jaring pengaman: lewati favorit yang kos-nya sudah tidak ada
-    const listFavorit = semuaFavorit.filter((favorit) => favorit.kos_id);
+    const listFavorit = semuaFavorit.filter((favorit) => favorit.kos_id).map(favorit => {
+      const kos = favorit.kos_id;
+      const available = kos.status_verifikasi === 'approved' && kos.pemilik_id?.status !== 'suspended';
+      return { _id: favorit._id, createdAt: favorit.createdAt, user_id: favorit.user_id,
+        kos_id: available ? formatPublicKos(kos) : { _id: kos._id, unavailable: true } };
+    });
 
     res.status(200).json({
       success: true,
@@ -30,12 +36,12 @@ const addFavorite = async (req, res, next) => {
   try {
     const { kosId } = req.params;
 
-    const kos = await Kos.findById(kosId);
+    const kos = await Kos.findById(kosId).populate('pemilik_id', 'status');
     if (!kos) {
       return res.status(404).json({ success: false, message: 'Kos tidak ditemukan' });
     }
 
-    if (kos.status_verifikasi !== 'approved') {
+    if (kos.status_verifikasi !== 'approved' || kos.pemilik_id?.status === 'suspended') {
       return res.status(400).json({
         success: false,
         message: 'Kos belum disetujui untuk publik sehingga belum dapat difavoritkan',
@@ -44,6 +50,7 @@ const addFavorite = async (req, res, next) => {
 
     const existing = await Favorit.findOne({ user_id: req.user._id, kos_id: kosId });
     if (existing) {
+      if (req.method === 'PUT') return res.json({ success: true, data: existing, message: 'Kos sudah tersimpan.' });
       return res.status(400).json({
         success: false,
         message: 'Kos sudah ada di dalam daftar favorit Anda',
@@ -61,6 +68,10 @@ const addFavorite = async (req, res, next) => {
       data: favorit,
     });
   } catch (error) {
+    if (req.method === 'PUT' && error.code === 11000) {
+      const data = await Favorit.findOne({ user_id: req.user._id, kos_id: req.params.kosId });
+      return res.json({ success: true, data, message: 'Kos sudah tersimpan.' });
+    }
     next(error);
   }
 };

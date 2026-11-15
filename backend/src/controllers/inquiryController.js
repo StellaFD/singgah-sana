@@ -1,5 +1,6 @@
 const Inquiry = require('../models/Inquiry');
 const Kos = require('../models/Kos');
+const { kirimNotifikasi } = require('../utils/notifikasi');
 
 const PESAN_INQUIRY_DUPLIKAT =
   'Anda masih memiliki pertanyaan yang menunggu balasan untuk kos ini. Mohon tunggu balasan pemilik sebelum mengirim pertanyaan baru';
@@ -15,12 +16,12 @@ const sendInquiry = async (req, res, next) => {
       });
     }
 
-    const kos = await Kos.findById(kos_id);
+    const kos = await Kos.findById(kos_id).populate('pemilik_id', 'status');
     if (!kos) {
       return res.status(404).json({ success: false, message: 'Kos tidak ditemukan' });
     }
 
-    if (kos.status_verifikasi !== 'approved') {
+    if (kos.status_verifikasi !== 'approved' || kos.pemilik_id?.status === 'suspended') {
       return res.status(400).json({
         success: false,
         message: 'Kos belum disetujui untuk publik sehingga belum dapat menerima pertanyaan',
@@ -42,11 +43,12 @@ const sendInquiry = async (req, res, next) => {
 
     const inquiry = await Inquiry.create({
       pencari_id: req.user._id,
-      pemilik_id: kos.pemilik_id,
+      pemilik_id: kos.pemilik_id?._id || kos.pemilik_id,
       kos_id,
       pesan,
       status: 'menunggu',
     });
+    await kirimNotifikasi(kos.pemilik_id, { tipe: 'pesan_baru', judul: 'Pertanyaan baru', isi: pesan, tautan: '/pemilik/pesan' });
 
     res.status(201).json({
       success: true,
@@ -74,7 +76,7 @@ const sendInquiry = async (req, res, next) => {
 const getMyInquiries = async (req, res, next) => {
   try {
     const semuaInquiry = await Inquiry.find({ pencari_id: req.user._id })
-      .populate('kos_id', 'nama alamat foto harga_per_bulan tipe')
+      .populate('kos_id', 'nama alamat foto harga_per_bulan tipe jumlah_kamar_tersedia')
       .populate('pemilik_id', 'nama nomor_telepon')
       .sort({ createdAt: -1 });
 
@@ -145,6 +147,7 @@ const replyInquiry = async (req, res, next) => {
     inquiry.balasan = balasan;
     inquiry.status = 'dibalas';
     const updated = await inquiry.save();
+    await kirimNotifikasi(inquiry.pencari_id, { tipe: 'balasan_pesan', judul: 'Pemilik membalas pertanyaanmu', isi: balasan, tautan: `/pesan?c=${inquiry._id}` });
 
     res.status(200).json({
       success: true,

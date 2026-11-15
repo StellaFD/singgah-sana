@@ -41,7 +41,15 @@ const userSchema = new mongoose.Schema(
     },
     foto_profil: {
       type: String,
-      default: 'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?auto=format&fit=crop&w=200&q=80',
+      default: '',
+    },
+    status: { type: String, enum: ['active', 'suspended'], default: 'active' },
+    token_version: { type: Number, default: 0, select: false },
+    password_updated_at: { type: Date, default: null },
+    notification_preferences: {
+      pesanPemilik: { type: Boolean, default: true },
+      pembaruanFavorit: { type: Boolean, default: true },
+      kabarProduk: { type: Boolean, default: false },
     },
   },
   {

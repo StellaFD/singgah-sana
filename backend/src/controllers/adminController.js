@@ -1,6 +1,7 @@
 const Kos = require('../models/Kos');
 const User = require('../models/User');
 const { safeSearchTerm, parsePagination, csvCell } = require('../utils/helpers');
+const { kirimNotifikasi } = require('../utils/notifikasi');
 
 const getAllKosAdmin = async (req, res, next) => {
   try {
@@ -55,6 +56,9 @@ const verifyKos = async (req, res, next) => {
         message: 'Status verifikasi harus bernilai "approved" atau "rejected"',
       });
     }
+    if (status_verifikasi === 'rejected' && (typeof catatan_verifikasi !== 'string' || !catatan_verifikasi.trim())) {
+      return res.status(422).json({ success: false, code: 'VALIDATION_ERROR', message: 'Alasan penolakan wajib diisi.' });
+    }
 
     const kos = await Kos.findById(req.params.id);
     if (!kos) {
@@ -66,7 +70,15 @@ const verifyKos = async (req, res, next) => {
     kos.diverifikasi_oleh = req.user._id;
     kos.diverifikasi_pada = new Date();
 
-    const updatedKos = await kos.save();
+    const updatedKos = await Kos.findOneAndUpdate({ _id: kos._id, status_verifikasi: 'pending' }, {
+      $set: { status_verifikasi, catatan_verifikasi: kos.catatan_verifikasi,
+        diverifikasi_oleh: req.user._id, diverifikasi_pada: kos.diverifikasi_pada },
+      $inc: { __v: 1 },
+    }, { new: true, runValidators: true });
+    if (!updatedKos) return res.status(409).json({ success: false, code: 'CONFLICT', message: 'Listing sudah diputuskan atau berubah. Muat ulang antrean.' });
+    await kirimNotifikasi(kos.pemilik_id, { tipe: status_verifikasi === 'approved' ? 'kos_disetujui' : 'kos_ditolak',
+      judul: status_verifikasi === 'approved' ? 'Listing disetujui' : 'Pengajuan listing ditolak',
+      isi: kos.catatan_verifikasi, tautan: `/pemilik/kos/${kos._id}` });
 
     res.status(200).json({
       success: true,
