@@ -272,8 +272,14 @@ describe('GET /api/kos/:id (detail kos publik & proteksi)', () => {
     expect(res.body.success).toBe(true);
     expect(res.body.data.nama).toBe('Kos Detail');
     expect(res.body.data.pemilik_id.nama).toBe(pemilik.nama);
-    // Tidak membocorkan password
+    // Tidak membocorkan password atau data privat akun pemilik
     expect(res.body.data.pemilik_id.password).toBeUndefined();
+    expect(res.body.data.pemilik_id.email).toBeUndefined();
+    expect(res.body.data.pemilik_id.nomor_telepon).toBeUndefined();
+    expect(res.body.data.pemilik_id.foto_profil).toBeUndefined();
+    expect(res.body.data.catatan_verifikasi).toBeUndefined();
+    expect(res.body.data.diverifikasi_oleh).toBeUndefined();
+    expect(res.body.data.diverifikasi_pada).toBeUndefined();
   });
 
   it('mengembalikan 404 jika ID kos tidak valid atau tidak ditemukan', async () => {
@@ -310,6 +316,126 @@ describe('GET /api/kos/:id (detail kos publik & proteksi)', () => {
 
     const res = await request(app).get(`/api/kos/${kos._id}`).set(auth(tokenB));
     expect(res.statusCode).toBe(403);
+  });
+});
+
+describe('Perlindungan Data Publik & DTO Whitelist (Keamanan P1)', () => {
+  it('listing publik (GET /api/kos) membersihkan email, nomor_telepon, foto_profil, dan catatan verifikasi admin', async () => {
+    const { user: admin } = await createUser('admin');
+    const { user: pemilik } = await createUser('pemilik');
+
+    await createKos(pemilik, {
+      nama: 'Kos Uji Listing Aman',
+      status_verifikasi: 'approved',
+      catatan_verifikasi: 'Disetujui admin untuk listing publik',
+      diverifikasi_oleh: admin._id,
+      diverifikasi_pada: new Date(),
+    });
+
+    const res = await request(app).get('/api/kos');
+
+    expect(res.statusCode).toBe(200);
+    expect(res.body.success).toBe(true);
+    expect(res.body.data.length).toBeGreaterThan(0);
+
+    const item = res.body.data.find((k) => k.nama === 'Kos Uji Listing Aman');
+    expect(item).toBeDefined();
+    // Pemilik hanya nama dan _id
+    expect(item.pemilik_id.nama).toBe(pemilik.nama);
+    expect(item.pemilik_id.email).toBeUndefined();
+    expect(item.pemilik_id.nomor_telepon).toBeUndefined();
+    expect(item.pemilik_id.foto_profil).toBeUndefined();
+    expect(item.pemilik_id.password).toBeUndefined();
+    // Metadata admin dibuang dari publik
+    expect(item.catatan_verifikasi).toBeUndefined();
+    expect(item.diverifikasi_oleh).toBeUndefined();
+    expect(item.diverifikasi_pada).toBeUndefined();
+    expect(item.riwayat_status).toBeUndefined();
+  });
+
+  it('detail publik (GET /api/kos/:id) untuk pencari yang login tetap memakai DTO whitelist tanpa bocoran privat', async () => {
+    const { user: admin } = await createUser('admin');
+    const { user: pemilik } = await createUser('pemilik');
+    const { token: tokenPencari } = await createUser('pencari');
+
+    const kos = await createKos(pemilik, {
+      nama: 'Kos Uji Pencari Detail',
+      status_verifikasi: 'approved',
+      catatan_verifikasi: 'Catatan admin rahasia',
+      diverifikasi_oleh: admin._id,
+      diverifikasi_pada: new Date(),
+    });
+
+    const res = await request(app).get(`/api/kos/${kos._id}`).set(auth(tokenPencari));
+
+    expect(res.statusCode).toBe(200);
+    expect(res.body.success).toBe(true);
+    expect(res.body.data.nama).toBe('Kos Uji Pencari Detail');
+    expect(res.body.data.pemilik_id.nama).toBe(pemilik.nama);
+    expect(res.body.data.pemilik_id.email).toBeUndefined();
+    expect(res.body.data.pemilik_id.nomor_telepon).toBeUndefined();
+    expect(res.body.data.pemilik_id.foto_profil).toBeUndefined();
+    expect(res.body.data.catatan_verifikasi).toBeUndefined();
+    expect(res.body.data.diverifikasi_oleh).toBeUndefined();
+  });
+
+  it('pemilik kos sendiri tetap mendapatkan data detail privat lengkap (email, nomor telepon, catatan verifikasi)', async () => {
+    const { user: admin } = await createUser('admin');
+    const { user: pemilik, token: tokenPemilik } = await createUser('pemilik');
+
+    const kosApproved = await createKos(pemilik, {
+      nama: 'Kos Approved Pemilik Sendiri',
+      status_verifikasi: 'approved',
+      catatan_verifikasi: 'Catatan internal admin',
+      diverifikasi_oleh: admin._id,
+      diverifikasi_pada: new Date(),
+    });
+
+    const resApproved = await request(app)
+      .get(`/api/kos/${kosApproved._id}`)
+      .set(auth(tokenPemilik));
+
+    expect(resApproved.statusCode).toBe(200);
+    expect(resApproved.body.data.pemilik_id.email).toBe(pemilik.email);
+    expect(resApproved.body.data.pemilik_id.nomor_telepon).toBe(pemilik.nomor_telepon);
+    expect(resApproved.body.data.catatan_verifikasi).toBe('Catatan internal admin');
+
+    // Cek juga saat status pending: pemilik sendiri tetap bisa mengakses
+    const kosPending = await createKos(pemilik, {
+      nama: 'Kos Pending Pemilik Sendiri',
+      status_verifikasi: 'pending',
+      catatan_verifikasi: 'Dokumen belum lengkap',
+    });
+
+    const resPending = await request(app)
+      .get(`/api/kos/${kosPending._id}`)
+      .set(auth(tokenPemilik));
+
+    expect(resPending.statusCode).toBe(200);
+    expect(resPending.body.data._id).toBe(String(kosPending._id));
+    expect(resPending.body.data.catatan_verifikasi).toBe('Dokumen belum lengkap');
+  });
+
+  it('admin tetap dapat mengakses data detail privat lengkap dan kos pending manapun', async () => {
+    const { user: admin, token: tokenAdmin } = await createUser('admin');
+    const { user: pemilik } = await createUser('pemilik');
+
+    const kosPending = await createKos(pemilik, {
+      nama: 'Kos Pending Untuk Admin',
+      status_verifikasi: 'pending',
+      catatan_verifikasi: 'Menunggu review izin operasional',
+    });
+
+    const resAdmin = await request(app)
+      .get(`/api/kos/${kosPending._id}`)
+      .set(auth(tokenAdmin));
+
+    expect(resAdmin.statusCode).toBe(200);
+    expect(resAdmin.body.data._id).toBe(String(kosPending._id));
+    expect(resAdmin.body.data.status_verifikasi).toBe('pending');
+    expect(resAdmin.body.data.catatan_verifikasi).toBe('Menunggu review izin operasional');
+    expect(resAdmin.body.data.pemilik_id.email).toBe(pemilik.email);
+    expect(resAdmin.body.data.pemilik_id.nomor_telepon).toBe(pemilik.nomor_telepon);
   });
 });
 

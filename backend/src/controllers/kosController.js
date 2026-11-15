@@ -139,6 +139,70 @@ const buildPublicKosFilter = (query) => {
   return filter;
 };
 
+/**
+ * Memformat dokumen kos ke DTO whitelist publik.
+ * Memastikan data sensitif akun pemilik (email, nomor_telepon, password, foto_profil)
+ * serta metadata admin (catatan_verifikasi, diverifikasi_oleh, diverifikasi_pada, riwayat_status)
+ * TIDAK dibocorkan ke respons publik untuk pengunjung anonim atau pencari kos.
+ */
+const formatPublicKos = (kosDoc) => {
+  if (!kosDoc) return null;
+  const doc = typeof kosDoc.toObject === 'function' ? kosDoc.toObject() : kosDoc;
+
+  // Pemilik ringkas: hanya nama dan _id untuk relasi kompatibilitas frontend
+  let pemilikPublic = undefined;
+  if (doc.pemilik_id && typeof doc.pemilik_id === 'object') {
+    pemilikPublic = {
+      ...(doc.pemilik_id._id ? { _id: doc.pemilik_id._id } : {}),
+      nama:
+        typeof doc.pemilik_id.nama === 'string' && doc.pemilik_id.nama.trim()
+          ? doc.pemilik_id.nama.trim()
+          : 'Pengelola kos',
+    };
+  } else if (doc.pemilik && typeof doc.pemilik === 'object') {
+    pemilikPublic = {
+      ...(doc.pemilik._id ? { _id: doc.pemilik._id } : {}),
+      nama:
+        typeof doc.pemilik.nama === 'string' && doc.pemilik.nama.trim()
+          ? doc.pemilik.nama.trim()
+          : 'Pengelola kos',
+    };
+  }
+
+  const publicDto = {
+    _id: doc._id,
+    ...(doc.id ? { id: doc.id } : {}),
+    nama: doc.nama,
+    deskripsi: doc.deskripsi,
+    alamat: doc.alamat,
+    area_kampus: doc.area_kampus,
+    koordinat: doc.koordinat,
+    foto: doc.foto,
+    harga_per_bulan: doc.harga_per_bulan,
+    tipe: doc.tipe,
+    fasilitas: doc.fasilitas,
+    luas_kamar: doc.luas_kamar,
+    peraturan: doc.peraturan,
+    jumlah_kamar_total: doc.jumlah_kamar_total,
+    jumlah_kamar_tersedia: doc.jumlah_kamar_tersedia,
+    status_verifikasi: doc.status_verifikasi,
+    ...(doc.ketersediaan_diperbarui_pada
+      ? { ketersediaan_diperbarui_pada: doc.ketersediaan_diperbarui_pada }
+      : {}),
+    createdAt: doc.createdAt,
+    updatedAt: doc.updatedAt,
+  };
+
+  if (pemilikPublic) {
+    publicDto.pemilik_id = pemilikPublic;
+    publicDto.pemilik = pemilikPublic;
+  } else if (doc.pemilik_id) {
+    publicDto.pemilik_id = doc.pemilik_id;
+  }
+
+  return publicDto;
+};
+
 const getAllKosPublic = async (req, res, next) => {
   try {
     const filter = buildPublicKosFilter(req.query);
@@ -165,21 +229,23 @@ const getAllKosPublic = async (req, res, next) => {
     const actualSkip = (currentPage - 1) * limitNum;
 
     const dataKos = await Kos.find(filter)
-      .populate('pemilik_id', 'nama nomor_telepon email')
+      .populate('pemilik_id', 'nama')
       .sort(sortOptions)
       .skip(actualSkip)
       .limit(limitNum);
 
+    const sanitizedData = dataKos.map((item) => formatPublicKos(item));
+
     res.status(200).json({
       success: true,
-      count: dataKos.length,
+      count: sanitizedData.length,
       pagination: {
         totalData,
         totalPages,
         currentPage,
         limit: limitNum,
       },
-      data: dataKos,
+      data: sanitizedData,
     });
   } catch (error) {
     if (error.statusCode) {
@@ -242,12 +308,17 @@ const getKosById = async (req, res, next) => {
       });
     }
 
-    if (kos.status_verifikasi !== 'approved') {
-      const user = req.user;
-      const isOwner =
-        user && kos.pemilik_id && kos.pemilik_id._id.toString() === user._id.toString();
-      const isAdmin = user && user.role === 'admin';
+    const user = req.user;
+    const ownerIdStr =
+      kos.pemilik_id && kos.pemilik_id._id
+        ? kos.pemilik_id._id.toString()
+        : kos.pemilik_id
+        ? kos.pemilik_id.toString()
+        : null;
+    const isOwner = Boolean(user && ownerIdStr && ownerIdStr === user._id.toString());
+    const isAdmin = Boolean(user && user.role === 'admin');
 
+    if (kos.status_verifikasi !== 'approved') {
       if (!isOwner && !isAdmin) {
         return res.status(403).json({
           success: false,
@@ -256,9 +327,18 @@ const getKosById = async (req, res, next) => {
       }
     }
 
+    // Pemilik kos sendiri atau admin berhak mengakses data privat lengkap
+    if (isOwner || isAdmin) {
+      return res.status(200).json({
+        success: true,
+        data: kos,
+      });
+    }
+
+    // Respons untuk publik (anonim / pencari / non-owner): DTO whitelist tanpa data privat
     res.status(200).json({
       success: true,
-      data: kos,
+      data: formatPublicKos(kos),
     });
   } catch (error) {
     next(error);
@@ -496,6 +576,7 @@ const deleteKos = async (req, res, next) => {
 };
 
 module.exports = {
+  formatPublicKos,
   getAllKosPublic,
   getKosMapPublic,
   getKosById,
