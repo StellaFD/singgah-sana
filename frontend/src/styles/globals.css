@@ -1,0 +1,112 @@
+@import "tailwindcss";
+
+:root {
+  --font-sora: 'Sora Variable', 'Sora', system-ui, -apple-system, sans-serif;
+  --font-inter: 'Inter Variable', 'Inter', system-ui, -apple-system, sans-serif;
+}
+
+@theme {
+  --color-brand-primary: #7C3AED;
+  --color-brand-hover: #6D28D9;
+  --color-brand-light: #8B5CF6;
+  --color-brand-lavender: #F5F3FF;
+
+  --color-ink: #0F172A;
+  --color-ink-muted: #64748B;
+  --color-ink-light: #94A3B8;
+
+  --color-surface: #FFFFFF;
+  --color-surface-canvas: #FFFFFF;
+  --color-surface-card: #FFFFFF;
+  --color-surface-subtle: #F8FAFC;
+  --color-surface-muted: #F8FAFC;
+  --color-surface-border: #E2E8F0;
+
+  --color-status-approvedBg: #F0FDF4;
+  --color-status-approvedBorder: #BBF7D0;
+  --color-status-approvedText: #166534;
+  --color-status-pendingBg: #F8FAFC;
+  --color-status-pendingBorder: #CBD5E1;
+  --color-status-pendingText: #475569;
+  --color-status-rejectedBg: #FEF2F2;
+  --color-status-rejectedBorder: #FECACA;
+  --color-status-rejectedText: #B91C1C;
+  --color-status-success: #166534;
+  --color-status-error: #B91C1C;
+
+  --color-status-approved-bg: #F0FDF4;
+  --color-status-approved-border: #BBF7D0;
+  --color-status-approved-text: #166534;
+  --color-status-pending-bg: #F8FAFC;
+  --color-status-pending-border: #CBD5E1;
+  --color-status-pending-text: #475569;
+  --color-status-rejected-bg: #FEF2F2;
+  --color-status-rejected-border: #FECACA;
+  --color-status-rejected-text: #B91C1C;
+
+  --color-success: #166534;
+  --color-success-bg: #F0FDF4;
+  --color-success-border: #BBF7D0;
+  --color-success-text: #166534;
+
+  --color-error: #B91C1C;
+  --color-error-bg: #FEF2F2;
+  --color-error-border: #FECACA;
+  --color-error-text: #B91C1C;
+
+  --color-gender-putraBg: #EFF6FF;
+  --color-gender-putraText: #1D4ED8;
+  --color-gender-putriBg: #FDF2F8;
+  --color-gender-putriText: #BE185D;
+  --color-gender-campurBg: #FAF5FF;
+  --color-gender-campurText: #7C3AED;
+
+  --color-gender-putra-bg: #EFF6FF;
+  --color-gender-putra-text: #1D4ED8;
+  --color-gender-putri-bg: #FDF2F8;
+  --color-gender-putri-text: #BE185D;
+  --color-gender-campur-bg: #FAF5FF;
+  --color-gender-campur-text: #7C3AED;
+
+  --font-sora: 'Sora Variable', 'Sora', system-ui, -apple-system, sans-serif;
+  --font-inter: 'Inter Variable', 'Inter', system-ui, -apple-system, sans-serif;
+
+  --shadow-hairline: 0 1px 2px 0 rgba(0, 0, 0, 0.05);
+  --shadow-floating: 0 8px 30px rgba(0, 0, 0, 0.06);
+  --shadow-card-hover: 0 10px 25px -5px rgba(15, 23, 42, 0.08);
+}
+
+@layer base {
+  body {
+    background-color: #FFFFFF;
+    color: #0F172A;
+    font-family: var(--font-inter, 'Inter Variable', 'Inter', system-ui, -apple-system, sans-serif);
+    -webkit-font-smoothing: antialiased;
+    font-feature-settings: "cv02", "cv03", "cv04", "cv11";
+  }
+
+  h1, h2, h3, h4, h5, h6 {
+    font-family: var(--font-sora, 'Sora Variable', 'Sora', system-ui, -apple-system, sans-serif);
+    letter-spacing: -0.025em;
+    color: #0F172A;
+  }
+}
+
+/* Custom minimal scrollbar */
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+
+::-webkit-scrollbar-track {
+  background: #F8FAFC;
+}
+
+::-webkit-scrollbar-thumb {
+  background: #CBD5E1;
+  border-radius: 9999px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: #94A3B8;
+}
