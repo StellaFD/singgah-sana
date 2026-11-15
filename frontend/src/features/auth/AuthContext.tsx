@@ -3,6 +3,7 @@
 import React, { createContext, useContext, useEffect, useState, useCallback } from 'react';
 import type { AuthStatus, AuthUser, AuthContextType } from '@/types/auth';
 import { fetchCurrentUser } from './authClient';
+import { sessionRequest } from './sessionClient';
 
 const AuthContext = createContext<AuthContextType>({
   status: 'loading',
@@ -11,6 +12,7 @@ const AuthContext = createContext<AuthContextType>({
   isUnavailable: false,
   isLoading: true,
   refresh: async () => {},
+  logout: async () => {},
 });
 
 export function AuthProvider({ children }: { children: React.ReactNode }) {
@@ -45,6 +47,19 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     await checkAuth();
   }, [checkAuth]);
 
+  const logout = useCallback(async () => {
+    await sessionRequest('/auth/logout', { method: 'POST' });
+    setUser(null);
+    setStatus('anonymous');
+  }, []);
+
+  useEffect(() => {
+    const handle = () => { void checkAuth(); };
+    window.addEventListener('focus', handle);
+    window.addEventListener('ss:auth-changed', handle);
+    return () => { window.removeEventListener('focus', handle); window.removeEventListener('ss:auth-changed', handle); };
+  }, [checkAuth]);
+
   const value: AuthContextType = {
     status,
     user,
@@ -52,6 +67,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     isUnavailable: status === 'unavailable',
     isLoading: status === 'loading',
     refresh,
+    logout,
   };
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;

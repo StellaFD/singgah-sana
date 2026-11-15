@@ -1,3 +1,4 @@
+import { shouldUseAdminMocks } from '@/lib/adminApiMode';
 import { useEffect, useState, type ChangeEvent, type FormEvent } from 'react';
 import Link from 'next/link';
 import { Search } from 'lucide-react';
@@ -39,7 +40,7 @@ type QueueResponse = {
 };
 type AdminModerationQueueProps = {
   expireSession: () => void;
-  token: string;
+  token: string | undefined;
 };
 
 const queueTypes: { label: string; value: QueueType }[] = [
@@ -438,7 +439,7 @@ export default function AdminModerationQueue({
         )}
       </section>
 
-      {queueType !== 'listing_baru' && (
+      {shouldUseAdminMocks() && queueType !== 'listing_baru' && (
         <p className="mt-4 text-xs leading-5 text-slate-500">
           Antrean perubahan saat ini menggunakan contoh mock lokal sampai
           endpoint baru tersedia. Keputusan atas perubahan belum dikirim ke

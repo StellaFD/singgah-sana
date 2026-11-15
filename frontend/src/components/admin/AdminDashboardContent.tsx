@@ -25,7 +25,7 @@ type DashboardStats = {
 
 type DashboardContentProps = {
   expireSession: () => void;
-  token: string;
+  token: string | undefined;
 };
 
 type StatCardProps = {
@@ -196,7 +196,7 @@ export default function AdminDashboardContent({
           value={stats?.kos.approved}
         />
         <StatCard
-          description="Pencari dan pemilik terdaftar"
+          description="Seluruh akun terdaftar"
           icon={Users}
           label="Pengguna"
           tone="bg-indigo-50 text-indigo-700"
@@ -294,14 +294,13 @@ export default function AdminDashboardContent({
             </div>
           </div>
           <p className="mt-5 rounded-lg bg-slate-50 px-4 py-3 text-sm leading-6 text-slate-600">
-            Riwayat aktivitas belum tersedia dari API backend.
+            Riwayat aktivitas belum tersedia.
           </p>
         </article>
       </section>
 
       <p className="mt-6 text-xs leading-5 text-slate-500">
-        Ringkasan laporan belum ditampilkan karena backend belum menyediakan API
-        pengelolaan laporan.
+        Pengelolaan laporan belum diaktifkan.
       </p>
     </>
   );

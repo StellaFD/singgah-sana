@@ -13,6 +13,7 @@ router.use(authorize('pencari'));
 
 router.get('/', getMyFavorites);
 router.post('/:kosId', addFavorite);
+router.put('/:kosId', addFavorite);
 router.delete('/:kosId', removeFavorite);
 
 module.exports = router;

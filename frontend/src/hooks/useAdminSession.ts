@@ -1,7 +1,5 @@
-import { useCallback, useEffect, useState } from 'react';
-import { getAdminSession } from '../lib/adminApi';
-import { ApiError } from '../lib/api';
-import { ADMIN_TOKEN_KEY } from '../lib/auth';
+import { useEffect, useState } from 'react';
+import { useAuth } from '@/features/auth/AuthContext';
 
 export type AdminUser = Record<string, unknown> & {
   email?: string;
@@ -23,7 +21,7 @@ export type AdminSession = {
   logout: () => void;
   retry: () => void;
   status: AdminSessionStatus;
-  token: string | null;
+  token: undefined;
 };
 
 export type AdminSessionRouter = {
@@ -31,136 +29,45 @@ export type AdminSessionRouter = {
   replace: (url: string) => unknown;
 };
 
-function isRecord(value: unknown): value is Record<string, unknown> {
-  return typeof value === 'object' && value !== null;
-}
+export default function useAdminSession(router: AdminSessionRouter): AdminSession {
+  const auth = useAuth();
+  const [error, setError] = useState('');
 
-function getAdminUser(response: unknown): AdminUser | null {
-  if (!isRecord(response) || !isRecord(response.data)) {
-    return null;
-  }
-
-  const user = response.data;
-  if (user.role !== 'admin') {
-    return null;
-  }
-
-  return {
-    ...user,
-    email: typeof user.email === 'string' ? user.email : undefined,
-    nama: typeof user.nama === 'string' ? user.nama : undefined,
-    role: 'admin',
-  };
-}
-
-export default function useAdminSession(
-  router: AdminSessionRouter
-): AdminSession {
-  const [admin, setAdmin] = useState<AdminUser | null>(null);
-  const [token, setToken] = useState<string | null>(null);
-  const [status, setStatus] = useState<AdminSessionStatus>('checking');
-  const [errorMessage, setErrorMessage] = useState('');
-  const [retryVersion, setRetryVersion] = useState(0);
-  const routerReady = router.isReady !== false;
-
-  const retry = useCallback(() => {
-    setStatus('checking');
-    setErrorMessage('');
-    setRetryVersion((version) => version + 1);
-  }, []);
-
-  const logout = useCallback(() => {
-    window.sessionStorage.removeItem(ADMIN_TOKEN_KEY);
-    setAdmin(null);
-    setToken(null);
-    setStatus('redirecting');
-    router.replace('/admin/login');
-  }, [router]);
-
-  const expireSession = useCallback(() => {
-    window.sessionStorage.removeItem(ADMIN_TOKEN_KEY);
-    setAdmin(null);
-    setToken(null);
-    setStatus('redirecting');
-    router.replace('/admin/login?expired=1');
-  }, [router]);
+  const status: AdminSessionStatus =
+    error || auth.isUnavailable
+      ? 'error'
+      : auth.isLoading
+      ? 'checking'
+      : !auth.isAuthenticated
+      ? 'redirecting'
+      : auth.user?.role !== 'admin'
+      ? 'forbidden'
+      : 'authenticated';
 
   useEffect(() => {
-    if (!routerReady) {
-      return;
+    if (status === 'redirecting') {
+      router.replace('/masuk?next=/admin');
     }
-
-    let isCurrent = true;
-    const storedToken = window.sessionStorage.getItem(ADMIN_TOKEN_KEY);
-
-    if (!storedToken) {
-      router.replace('/admin/login');
-      return () => {
-        isCurrent = false;
-      };
-    }
-    const sessionToken = storedToken;
-
-    async function checkSession() {
-      try {
-        const result: unknown = await getAdminSession(sessionToken);
-        if (!isCurrent) {
-          return;
-        }
-
-        const user = getAdminUser(result);
-        if (!user) {
-          window.sessionStorage.removeItem(ADMIN_TOKEN_KEY);
-          setAdmin(null);
-          setToken(null);
-          setStatus('forbidden');
-          return;
-        }
-
-        setAdmin(user);
-        setToken(sessionToken);
-        setStatus('authenticated');
-      } catch (error) {
-        if (!isCurrent) {
-          return;
-        }
-
-        if (error instanceof ApiError && error.status === 403) {
-          window.sessionStorage.removeItem(ADMIN_TOKEN_KEY);
-          setAdmin(null);
-          setToken(null);
-          setStatus('forbidden');
-          return;
-        }
-
-        if (error instanceof ApiError && error.status === 401) {
-          expireSession();
-          return;
-        }
-
-        setErrorMessage(
-          error instanceof Error
-            ? error.message
-            : 'Sesi admin tidak dapat diperiksa.'
-        );
-        setStatus('error');
-      }
-    }
-
-    void checkSession();
-
-    return () => {
-      isCurrent = false;
-    };
-  }, [expireSession, retryVersion, router, routerReady]);
+  }, [router, status]);
 
   return {
-    admin,
-    errorMessage,
-    expireSession,
-    logout,
-    retry,
+    admin: auth.user?.role === 'admin' ? { ...auth.user, role: 'admin' } : null,
+    token: undefined,
     status,
-    token,
+    errorMessage: error || 'Sesi tidak dapat diperiksa. Coba lagi.',
+    expireSession: () => {
+      void auth.refresh();
+      router.replace('/masuk?next=/admin&sesi=berakhir');
+    },
+    logout: () => {
+      void auth.logout().then(
+        () => router.replace('/masuk'),
+        () => setError('Keluar gagal. Coba lagi.')
+      );
+    },
+    retry: () => {
+      setError('');
+      void auth.refresh();
+    },
   };
 }

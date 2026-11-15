@@ -6,7 +6,7 @@ import AdminLayout from './AdminLayout';
 export type AdminPageRenderProps = {
   admin: AdminUser;
   expireSession: () => void;
-  token: string;
+  token: string | undefined;
 };
 
 export type AdminPageViewProps = {
@@ -74,7 +74,7 @@ export default function AdminPageView({
     );
   }
 
-  if (!session.admin || !session.token) {
+  if (!session.admin) {
     return (
       <main
         aria-live="polite"

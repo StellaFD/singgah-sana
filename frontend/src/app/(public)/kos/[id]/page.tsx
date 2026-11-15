@@ -252,7 +252,7 @@ export default function KosDetailPage() {
 
               <p className="text-sm text-ink-muted mt-2 flex items-center gap-1.5">
                 <MapPin className="w-4 h-4 text-ink-muted shrink-0" />
-                <span>{kos.alamat || kos.display_lokasi || 'Kawasan Sekitar Kampus UGM'}</span>
+                <span>{kos.alamat || kos.display_lokasi || 'Kawasan Lokasi belum dicantumkan'}</span>
               </p>
 
               {kos.ketersediaan_diperbarui_pada && (

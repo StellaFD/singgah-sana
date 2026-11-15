@@ -3,7 +3,7 @@ import {
   hasPendingMockAdminSubmission,
   isAdminSubmissionListResponse,
 } from './adminSubmissionApi';
-import { shouldUseAdminV1Api } from './adminApiMode';
+import { shouldUseAdminV1Api, shouldUseAdminMocks } from './adminApiMode';
 import {
   isMockAdminChangeKos,
   mockChangeKosDetail,
@@ -13,6 +13,7 @@ import {
 const MOCK_KOS_DECISIONS_KEY = 'singgah-sana:admin:mock-kos-decisions';
 
 function readMockKosDecisions() {
+  if (!shouldUseAdminMocks()) return [];
   if (typeof window === 'undefined') {
     return [];
   }
@@ -318,7 +319,7 @@ export async function getAdminModerationQueue(queryString, token) {
       .map(mapPendingKosToQueueItem);
   }
 
-  if (jenis !== 'listing_baru' && hasPendingMockAdminSubmission()) {
+  if (shouldUseAdminMocks() && jenis !== 'listing_baru' && hasPendingMockAdminSubmission()) {
     items.push(mockChangeQueueItem);
   }
 
@@ -346,7 +347,7 @@ export async function getAdminModerationQueue(queryString, token) {
 
 export async function getAdminKosDetail(id, token) {
   const useLiveApi = shouldUseAdminV1Api();
-  if (!useLiveApi && isMockAdminChangeKos(id)) {
+  if (shouldUseAdminMocks() && !useLiveApi && isMockAdminChangeKos(id)) {
     return { success: true, data: mockChangeKosDetail };
   }
 
@@ -368,7 +369,7 @@ export async function getAdminKosDetail(id, token) {
 export async function decideAdminKos(id, decision, token, currentKos) {
   if (
     decision.status_verifikasi === 'revision' &&
-    !shouldUseAdminV1Api()
+    shouldUseAdminMocks() && !shouldUseAdminV1Api()
   ) {
     const reason = decision.catatan_verifikasi?.trim();
     if (!reason) {

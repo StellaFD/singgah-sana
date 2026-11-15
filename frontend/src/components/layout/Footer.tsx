@@ -39,49 +39,31 @@ export default function Footer() {
                 onClick={() =>
                   handleOpenInfo(
                     'Tentang Singgah-sana',
-                    'Singgah-sana adalah direktori pencarian hunian kos terkurasi di sekitar kampus UGM untuk membantu mahasiswa menemukan kos dengan informasi yang transparan dan listing yang ditinjau admin. Dikembangkan untuk Milestone 2 Pengembangan Aplikasi Web (PAW) DTETI FT UGM.'
+                    'Singgah-sana adalah platform direktori pencarian hunian kos di Indonesia untuk membantu pencari menemukan informasi kos yang transparan serta memudahkan pengelola mempublikasikan listing kamar.'
                   )
                 }
                 className="hover:text-brand-primary transition-colors focus:outline-none focus:ring-2 focus:ring-brand-primary rounded cursor-pointer"
               >
                 Tentang kami
               </button>
-              <button
-                type="button"
-                onClick={() =>
-                  handleOpenInfo(
-                    'Pusat Bantuan & Pertanyaan',
-                    'Untuk pertanyaan mengenai kamar atau fasilitas, Anda dapat menggunakan opsi "Tanya pemilik" yang tersedia pada setiap halaman detail kos.'
-                  )
-                }
-                className="hover:text-brand-primary transition-colors focus:outline-none focus:ring-2 focus:ring-brand-primary rounded cursor-pointer"
+              <Link
+                href="/bantuan"
+                className="hover:text-brand-primary transition-colors focus:outline-none focus:ring-2 focus:ring-brand-primary rounded"
               >
                 Pusat bantuan
-              </button>
-              <button
-                type="button"
-                onClick={() =>
-                  handleOpenInfo(
-                    'Informasi Privasi',
-                    'Kami menghormati privasi pengguna. Data pribadi akun pengelola atau pemilik tidak dipublikasikan ke publik tanpa persetujuan, dan platform memprioritaskan keamanan komunikasi.'
-                  )
-                }
-                className="hover:text-brand-primary transition-colors focus:outline-none focus:ring-2 focus:ring-brand-primary rounded cursor-pointer"
+              </Link>
+              <Link
+                href="/privasi"
+                className="hover:text-brand-primary transition-colors focus:outline-none focus:ring-2 focus:ring-brand-primary rounded"
               >
                 Privasi
-              </button>
-              <button
-                type="button"
-                onClick={() =>
-                  handleOpenInfo(
-                    'Ketentuan Penggunaan Platform',
-                    'Informasi spesifikasi kamar, ketersediaan, rincian biaya, dan aturan kos ditampilkan secara transparan berdasarkan pelaporan pengelola dan peninjauan kurasi admin.'
-                  )
-                }
-                className="hover:text-brand-primary transition-colors focus:outline-none focus:ring-2 focus:ring-brand-primary rounded cursor-pointer"
+              </Link>
+              <Link
+                href="/ketentuan"
+                className="hover:text-brand-primary transition-colors focus:outline-none focus:ring-2 focus:ring-brand-primary rounded"
               >
                 Ketentuan penggunaan
-              </button>
+              </Link>
             </div>
 
             {/* Copyright */}

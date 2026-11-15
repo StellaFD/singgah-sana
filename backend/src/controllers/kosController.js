@@ -1,5 +1,6 @@
 const mongoose = require('mongoose');
 const Kos = require('../models/Kos');
+const User = require('../models/User');
 const Favorit = require('../models/Favorit');
 const Inquiry = require('../models/Inquiry');
 const {
@@ -206,6 +207,7 @@ const formatPublicKos = (kosDoc) => {
 const getAllKosPublic = async (req, res, next) => {
   try {
     const filter = buildPublicKosFilter(req.query);
+    filter.pemilik_id = { $nin: await User.find({ status: 'suspended' }).distinct('_id') };
     const { sort, page, limit } = req.query;
 
     let sortOptions = ALLOWED_SORT_OPTIONS.terbaru;
@@ -261,6 +263,7 @@ const getAllKosPublic = async (req, res, next) => {
 const getKosMapPublic = async (req, res, next) => {
   try {
     const filter = buildPublicKosFilter(req.query);
+    filter.pemilik_id = { $nin: await User.find({ status: 'suspended' }).distinct('_id') };
     const MAX_MAP_MARKERS = 500;
 
     const totalCount = await Kos.countDocuments(filter);
@@ -298,7 +301,7 @@ const getKosById = async (req, res, next) => {
 
     const kos = await Kos.findById(req.params.id).populate(
       'pemilik_id',
-      'nama nomor_telepon email foto_profil role'
+      'nama nomor_telepon email foto_profil role status'
     );
 
     if (!kos) {
@@ -318,7 +321,7 @@ const getKosById = async (req, res, next) => {
     const isOwner = Boolean(user && ownerIdStr && ownerIdStr === user._id.toString());
     const isAdmin = Boolean(user && user.role === 'admin');
 
-    if (kos.status_verifikasi !== 'approved') {
+    if (kos.status_verifikasi !== 'approved' || kos.pemilik_id?.status === 'suspended') {
       if (!isOwner && !isAdmin) {
         return res.status(403).json({
           success: false,
@@ -415,7 +418,7 @@ const createKos = async (req, res, next) => {
       harga_per_bulan: Number(harga_per_bulan),
       tipe: tipe.toLowerCase(),
       fasilitas: parsedFasilitas,
-      luas_kamar: luas_kamar || '3x4 meter',
+      luas_kamar: luas_kamar || '',
       peraturan: parsedPeraturan,
       jumlah_kamar_total: Number(jumlah_kamar_total),
       jumlah_kamar_tersedia:

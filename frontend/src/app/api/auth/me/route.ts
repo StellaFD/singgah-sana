@@ -115,6 +115,11 @@ export async function GET(request: NextRequest) {
           : 'Pengguna',
         role: rawRole as AuthUser['role'],
         status: userStatus,
+        email: typeof userCandidate.email === 'string' ? userCandidate.email : undefined,
+        nomor_telepon: typeof userCandidate.nomor_telepon === 'string' ? userCandidate.nomor_telepon : undefined,
+        foto_profil: typeof userCandidate.foto_profil === 'string' ? userCandidate.foto_profil : undefined,
+        email_verified: userCandidate.email_verified === true,
+        password_updated_at: typeof userCandidate.password_updated_at === 'string' ? userCandidate.password_updated_at : undefined,
       };
 
       return NextResponse.json({

@@ -1,5 +1,5 @@
 import { ApiError, apiRequest } from './api';
-import { shouldUseAdminV1Api } from './adminApiMode';
+import { shouldUseAdminV1Api, shouldUseAdminMocks } from './adminApiMode';
 
 export type AdminKosContent = {
   nama: string;
@@ -303,14 +303,14 @@ export function getMockAdminSubmission(): AdminSubmission {
 }
 
 export function hasPendingMockAdminSubmission(): boolean {
-  return getCurrentMockSubmission().status === 'pending';
+  return shouldUseAdminMocks() && getCurrentMockSubmission().status === 'pending';
 }
 
 export async function getAdminSubmissionDetail(
   id: string,
-  token: string
+  token: string | undefined
 ): Promise<AdminSubmission> {
-  if (!shouldUseAdminV1Api() && isMockAdminSubmissionId(id)) {
+  if (shouldUseAdminMocks() && !shouldUseAdminV1Api() && isMockAdminSubmissionId(id)) {
     return getCurrentMockSubmission();
   }
 
@@ -328,7 +328,7 @@ export async function getAdminSubmissionDetail(
 export async function decideAdminSubmission(
   id: string,
   decision: AdminSubmissionDecision,
-  token: string
+  token: string | undefined
 ): Promise<AdminSubmission> {
   const note = decision.catatan_verifikasi?.trim();
   if (
@@ -338,7 +338,7 @@ export async function decideAdminSubmission(
     throw new Error('Catatan wajib diisi untuk revisi atau penolakan.');
   }
 
-  if (!shouldUseAdminV1Api() && isMockAdminSubmissionId(id)) {
+  if (shouldUseAdminMocks() && !shouldUseAdminV1Api() && isMockAdminSubmissionId(id)) {
     const current = getCurrentMockSubmission();
     if (current.status !== 'pending' || current.version !== decision.expected_version) {
       throw new ApiError(

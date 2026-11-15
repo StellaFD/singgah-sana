@@ -140,7 +140,7 @@ export default function KosCard({
 
         {/* Lokasi Kos */}
         <p className="text-xs text-ink-muted line-clamp-1">
-          {kos.display_lokasi || kos.area_kampus || 'Sekitar Kampus UGM'}
+          {kos.display_lokasi || kos.area_kampus || 'Lokasi belum dicantumkan'}
         </p>
 
         {/* Fasilitas Riil Ringkas */}

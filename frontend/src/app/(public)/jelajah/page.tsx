@@ -328,7 +328,7 @@ function JelajahContent() {
         <div className="flex items-center justify-between">
           <div>
             <h1 className="font-sora font-semibold text-2xl text-ink">
-              {areaParam && areaParam !== 'Semua Area' ? `Kos di ${areaParam}` : 'Kos di sekitar Kampus UGM'}
+              {areaParam && areaParam !== 'Semua Area' ? `Kos di ${areaParam}` : 'Temukan kos di Indonesia'}
             </h1>
             <p className="text-sm text-ink-muted mt-0.5">
               {summaryText}

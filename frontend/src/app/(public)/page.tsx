@@ -49,11 +49,11 @@ export default async function HomePage() {
 
       {/* 2. Konten Utama */}
       <div className="max-w-[1440px] mx-auto w-full px-6 sm:px-12 lg:px-16 py-16 flex flex-col gap-16">
-        {/* Section: Pilihan kos di sekitar UGM */}
+        {/* Section: Pilihan kos untukmu */}
         <section className="flex flex-col gap-6">
           <div>
             <h2 className="font-sora font-semibold text-2xl text-ink leading-[32px]">
-              Pilihan kos di sekitar UGM
+              Pilihan kos untukmu
             </h2>
             <p className="text-base text-ink-muted leading-[24px] mt-1">
               Informasi jelas, pilihan lebih tenang.
@@ -91,29 +91,29 @@ export default async function HomePage() {
           </div>
         </section>
 
-        {/* Section: Mulai dari area favoritmu */}
+        {/* Section: Mulai dari kota tujuanmu */}
         <section id="area-kampus" className="flex flex-col gap-6 scroll-mt-28">
           <div>
             <h2 className="font-sora font-semibold text-2xl text-ink leading-[32px]">
-              Mulai dari area favoritmu
+              Mulai dari kota tujuanmu
             </h2>
             <p className="text-base text-ink-muted leading-[24px] mt-1">
-              Dekat dengan kampus dan keseharian kuliahmu.
+              Cari kos berdasarkan kota, area, atau alamat yang kamu butuhkan.
             </p>
           </div>
 
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
             {[
-              { nama: 'Pogung', konteks: 'Akses dekat Fakultas Teknik & MIPA', query: 'Pogung' },
-              { nama: 'Sekip', konteks: 'Sekitar RSUP Dr. Sardjito & Kedokteran', query: 'Sekip' },
-              { nama: 'Kaliurang', konteks: 'Akses gerbang utara & barat UGM', query: 'Kaliurang' },
-              { nama: 'Karangmalang', konteks: 'Dekat Lembah UGM & UNY', query: 'Karangmalang' },
-              { nama: 'Sendowo', konteks: 'Dekat FK-KMK & Rumah Sakit Akademik', query: 'Sendowo' },
-              { nama: 'Blimbingsari', konteks: 'Dekat gerbang timur & vokasi', query: 'Blimbingsari' },
+              { nama: 'Jakarta', konteks: 'Cari kos di Jakarta', query: 'Jakarta' },
+              { nama: 'Bandung', konteks: 'Cari kos di Bandung', query: 'Bandung' },
+              { nama: 'Surabaya', konteks: 'Cari kos di Surabaya', query: 'Surabaya' },
+              { nama: 'Yogyakarta', konteks: 'Cari kos di Yogyakarta', query: 'Yogyakarta' },
+              { nama: 'Semarang', konteks: 'Cari kos di Semarang', query: 'Semarang' },
+              { nama: 'Malang', konteks: 'Cari kos di Malang', query: 'Malang' },
             ].map((area) => (
               <Link
                 key={area.nama}
-                href={`/jelajah?area_kampus=${encodeURIComponent(area.query)}`}
+                href={`/jelajah?q=${encodeURIComponent(area.query)}`}
                 className="bg-white border border-surface-border rounded-2xl p-4 flex items-center gap-3 transition-all hover:border-brand-primary/50 hover:shadow-sm"
               >
                 <div className="w-10 h-10 rounded-lg bg-surface-subtle flex items-center justify-center text-ink shrink-0">
