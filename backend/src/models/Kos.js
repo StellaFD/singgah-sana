@@ -31,10 +31,14 @@ const kosSchema = new mongoose.Schema(
       latitude: {
         type: Number,
         required: [true, 'Latitude wajib diisi'],
+        min: [-90, 'Latitude minimal -90'],
+        max: [90, 'Latitude maksimal 90'],
       },
       longitude: {
         type: Number,
         required: [true, 'Longitude wajib diisi'],
+        min: [-180, 'Longitude minimal -180'],
+        max: [180, 'Longitude maksimal 180'],
       },
     },
     foto: {
