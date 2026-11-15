@@ -19,7 +19,10 @@ function JelajahContent() {
   const searchParams = useSearchParams();
 
   // URL state synchronization: canonical menang lewat shared parser
-  const parsed = useMemo(() => parseSearchParams(searchParams), [searchParams]);
+  const parsed = useMemo(
+    () => parseSearchParams(searchParams ?? new URLSearchParams()),
+    [searchParams]
+  );
 
   const {
     q: qParam,
@@ -67,7 +70,7 @@ function JelajahContent() {
   // Helper untuk update query params URL: selalu hapus alias dan gunakan canonical
   const updateQuery = (newParams: Record<string, unknown>, resetPage = true) => {
     const updated = updateCanonicalSearchParams(
-      new URLSearchParams(searchParams.toString()),
+      new URLSearchParams(searchParams?.toString() ?? ''),
       newParams,
       resetPage
     );

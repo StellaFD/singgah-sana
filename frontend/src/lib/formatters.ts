@@ -23,3 +23,21 @@ export function formatDate(dateString: unknown): string {
     year: 'numeric',
   });
 }
+
+export function formatAdminDate(value: unknown): string {
+  const date =
+    value instanceof Date
+      ? value
+      : typeof value === 'string' || typeof value === 'number'
+        ? new Date(value)
+        : null;
+
+  if (!date || Number.isNaN(date.getTime())) {
+    return 'Tanggal tidak tersedia';
+  }
+
+  return new Intl.DateTimeFormat('id-ID', {
+    dateStyle: 'medium',
+    timeStyle: 'short',
+  }).format(date);
+}
