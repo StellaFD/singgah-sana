@@ -20,7 +20,7 @@ import { formatAdminDate } from '../../lib/formatters';
 
 type AdminKosManagementProps = {
   expireSession: () => void;
-  token: string;
+  token: string | undefined;
 };
 type FilterState = Pick<
   AdminKosFilters,

@@ -16,6 +16,7 @@ import {
 } from '../../lib/adminApi';
 import { isMockAdminChangeKos } from '../../lib/adminMockData';
 import { ApiError } from '../../lib/api';
+import { shouldUseAdminMocks } from '../../lib/adminApiMode';
 
 function formatCurrency(value) {
   if (typeof value !== 'number' || !Number.isFinite(value)) {
@@ -108,7 +109,7 @@ function KosReviewDetail({ token, expireSession }) {
   async function submitDecision(event) {
     event.preventDefault();
     const reason = decisionNote.trim();
-    if (!decisionIntent || !reason || isSubmittingDecision) {
+    if (!decisionIntent || (decisionIntent !== 'approved' && !reason) || isSubmittingDecision) {
       return;
     }
 
@@ -347,7 +348,7 @@ function KosReviewDetail({ token, expireSession }) {
           <p className="mt-5 rounded-lg border border-sky-100 bg-sky-50 px-4 py-3 text-sm leading-6 text-sky-900">
             {changes.length > 0
               ? 'Versi terbit tetap tampil di publik sampai admin menyetujui perubahan ini.'
-              : 'Detail ini menampilkan data kos yang tersimpan saat ini. Backend belum menyediakan versi pembanding atau riwayat perubahan per field.'}
+              : 'Detail ini menampilkan data listing yang diajukan.'}
           </p>
         </section>
 
@@ -455,8 +456,7 @@ function KosReviewDetail({ token, expireSession }) {
           <section className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm sm:p-7">
             <h3 className="font-semibold">Keputusan moderasi</h3>
             <p className="mt-1 text-sm leading-6 text-slate-600">
-              Setiap keputusan harus disertai alasan. Alasan akan disimpan
-              bersama status verifikasi kos.
+              Alasan wajib untuk penolakan. Catatan persetujuan bersifat opsional.
             </p>
 
             {!decisionIntent ? (
@@ -472,6 +472,8 @@ function KosReviewDetail({ token, expireSession }) {
                 <button
                   className="inline-flex items-center gap-2 rounded-lg bg-orange-600 px-4 py-2.5 text-sm font-semibold text-white hover:bg-orange-700 focus:outline-none focus:ring-4 focus:ring-orange-100"
                   onClick={() => setDecisionIntent('revision')}
+                  disabled={!shouldUseAdminMocks()}
+                  title={!shouldUseAdminMocks() ? 'Alur revisi belum diaktifkan' : undefined}
                   type="button"
                 >
                   Minta revisi
@@ -509,14 +511,14 @@ function KosReviewDetail({ token, expireSession }) {
                 )}
                 <label className="block">
                   <span className="text-sm font-medium text-slate-700">
-                    Alasan keputusan <span aria-hidden="true">*</span>
+                    Alasan keputusan {decisionIntent !== 'approved' && <span aria-hidden="true">*</span>}
                   </span>
                   <textarea
-                    aria-required="true"
+                    aria-required={decisionIntent !== 'approved'}
                     className="mt-2 min-h-28 w-full rounded-lg border border-slate-300 px-3 py-2.5 text-sm leading-6 outline-none focus:border-indigo-600 focus:ring-4 focus:ring-indigo-100"
                     onChange={(event) => setDecisionNote(event.target.value)}
                     placeholder="Jelaskan alasan keputusan secara spesifik..."
-                    required
+                    required={decisionIntent !== 'approved'}
                     value={decisionNote}
                   />
                 </label>
@@ -539,7 +541,7 @@ function KosReviewDetail({ token, expireSession }) {
                           ? 'bg-orange-600 hover:bg-orange-700 focus:ring-orange-100'
                           : 'bg-red-700 hover:bg-red-800 focus:ring-red-100'
                     }`}
-                    disabled={!decisionNote.trim() || isSubmittingDecision}
+                    disabled={(decisionIntent !== 'approved' && !decisionNote.trim()) || isSubmittingDecision}
                     type="submit"
                   >
                     {isSubmittingDecision

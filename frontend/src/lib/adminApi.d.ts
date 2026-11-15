@@ -8,23 +8,23 @@ export function loginAdmin(credentials: {
   };
 }>;
 
-export function getAdminSession(token: string): Promise<unknown>;
+export function getAdminSession(token: string | undefined): Promise<unknown>;
 
-export function getAdminStats(token: string): Promise<{
+export function getAdminStats(token: string | undefined): Promise<{
   data: unknown;
 }>;
 
 export function getAdminKos(
   queryString: string,
-  token: string
+  token: string | undefined
 ): Promise<unknown>;
 
 export function getAdminModerationQueue(
   queryString: string,
-  token: string
+  token: string | undefined
 ): Promise<unknown>;
 
-export function downloadAdminKosCsv(token: string): Promise<{
+export function downloadAdminKosCsv(token: string | undefined): Promise<{
   blob: Blob;
   filename: string;
 }>;

@@ -203,7 +203,7 @@ function getLegacyKosList(result: unknown): AdminKosListResponse {
 
 export async function getAdminKosManagement(
   filters: AdminKosFilters,
-  token: string
+  token: string | undefined
 ): Promise<AdminKosListResponse> {
   const params = new URLSearchParams({
     page: String(filters.page),

@@ -1,22 +1,11 @@
+import { sessionRequest } from '@/features/auth/sessionClient';
 import type { ApiResponse } from '@/types/api';
-
-export interface FavoritItem {
-  kos_id: string;
-  ditambahkan_pada: string;
-}
-
-/**
- * STUB SEMENTARA: Client Favorit (Boundary Integrasi P2/P3)
- * PERHATIAN: Endpoint API favorit backend belum tersedia dan belum diimplementasikan.
- * Fungsi ini mengembalikan status `unavailable` secara jujur dan TIDAK menyimpan data secara nyata.
- */
-export async function toggleFavoritApi(
-  _kosId: string,
-  _signal?: AbortSignal
-): Promise<ApiResponse<{ bookmarked: boolean }>> {
-  return {
-    success: false,
-    unavailable: true,
-    message: 'Layanan simpan favorit saat ini belum tersedia. Pilihan Anda belum tersimpan.',
-  };
+export async function toggleFavoritApi(kosId:string,signal?:AbortSignal):Promise<ApiResponse<{bookmarked:boolean}>> {
+ try {
+  const list=await sessionRequest<{data:Array<{kos_id:{_id:string}}>}>('/favorit',{signal});
+  const bookmarked=!list.data.some(item=>item.kos_id?._id===kosId);
+  await sessionRequest('/favorit/'+encodeURIComponent(kosId),{method:bookmarked?'PUT':'DELETE',signal});
+  window.dispatchEvent(new Event('ss:favorites-changed'));
+  return {success:true,data:{bookmarked},message:bookmarked?'Kos disimpan ke favorit.':'Kos dihapus dari favorit.'};
+ }catch(error){return {success:false,message:error instanceof Error?error.message:'Favorit belum dapat diperbarui.'};}
 }

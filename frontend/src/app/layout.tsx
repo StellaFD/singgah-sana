@@ -7,9 +7,9 @@ import 'leaflet/dist/leaflet.css';
 import { AuthProvider } from '@/features/auth/AuthContext';
 
 export const metadata: Metadata = {
-  title: 'Singgah-sana | Direktori Kos Mahasiswa Sekitar Kampus UGM',
+  title: 'Singgah-sana | Direktori Kos di Indonesia',
   description:
-    'Direktori pencarian hunian kos terkurasi di sekitar kampus UGM Yogyakarta dengan informasi ketersediaan transparan dan listing ditinjau admin.',
+    'Direktori pencarian hunian kos terkurasi di Indonesia dengan informasi ketersediaan transparan dan listing ditinjau admin.',
   icons: {
     icon: '/assets/brand-logo.svg',
     shortcut: '/assets/brand-logo.svg',

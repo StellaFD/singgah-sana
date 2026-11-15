@@ -18,7 +18,7 @@ import { ApiError } from '../../lib/api';
 type AdminSubmissionDetailProps = {
   expireSession: () => void;
   submissionId: string;
-  token: string;
+  token: string | undefined;
 };
 type DecisionIntent = AdminSubmissionDecision['keputusan'];
 

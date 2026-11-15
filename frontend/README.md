@@ -1,20 +1,18 @@
-# Singgah-sana Frontend · Fondasi Brand, TypeScript & App Router (P1)
+# Singgah-sana Frontend · Integrasi App Router, Session Auth & Portal Terpadu
 
 > **Mata Kuliah:** Pengembangan Aplikasi Web (PAW) — Departemen Teknik Elektro dan Teknologi Informasi, FT UGM (2026/2027)
 >
-> **Branch Milestone:** `feat/p1-typescript-brand-foundation`
->
-> **Modul:** **P1 · Fondasi TypeScript, Brand Vektor Resmi, App Router & DTO Whitelist**
+> **Branch Milestone:** `integration/shared-auth-and-frontends`
 >
 > **Spesifikasi Stack:** Next.js `16.4.6` (App Router), React `19.3.0`, Tailwind CSS `4.3.5`, TypeScript `5.9.3`, Node.js `24.15.0` (types `24.19.2`), Lucide React `1.73.0`, Fontsource Inter & Sora Variable `5.3.0`, Runner `tsx` `4.23.15`
 >
-> **Spesifikasi Desain:** Figma Resmi Node `191:9088` (Product/Brand/Logo) & Milestone 2 High-Fidelity UI
+> **Spesifikasi Desain:** Figma Resmi Node `191:9088` (Product/Brand/Logo) & Milestone High-Fidelity UI
 
 ---
 
-## 1. Arsitektur Direktori & Migrasi TypeScript
+## 1. Arsitektur Direktori & Status Kode
 
-Seluruh kode aplikasi frontend telah dimigrasikan ke TypeScript strict (`strict: true`, `allowJs: false`) di dalam `src/` modular, dengan alias path `@/*` mengarah ke `./src/*`:
+Frontend Singgah-sana mengintegrasikan modul publik, modul akun pencari, portal pemilik kos, dan panel admin ke dalam satu Next.js App Router terpadu di direktori `src/`:
 
 ```text
 frontend/
@@ -24,186 +22,137 @@ frontend/
 │       └── placeholder-kos.svg      # Placeholder netral foto listing
 ├── src/
 │   ├── app/
-│   │   ├── (public)/                # Route group publik (memisahkan layout navbar/footer dari modul rekan P2/P3/P4)
-│   │   │   ├── layout.tsx           # Layout publik dengan Navbar, <main>, dan Footer
+│   │   ├── (public)/                # Rute publik (layout bersama: Navbar & Footer)
 │   │   │   ├── page.tsx             # Halaman Beranda (/)
 │   │   │   ├── jelajah/page.tsx     # Halaman Jelajah (/jelajah) dengan Filter & Peta Leaflet
 │   │   │   ├── kos/[id]/page.tsx    # Halaman Detail Kos (/kos/[id])
 │   │   │   └── ui/page.tsx          # Halaman Katalog Desain & Komponen (/ui)
-│   │   ├── api/                     # Gateway Same-Origin Proxy ke Express Backend (Server-Only API_BASE_URL)
-│   │   │   ├── auth/me/route.ts     # Pengecekan sesi cookie (/api/auth/me) dengan timeout & whitelist DTO
-│   │   │   ├── kos/route.ts         # Proxy daftar kos publik (/api/kos) dengan pagination format aktual
-│   │   │   ├── kos/map/route.ts     # Proxy marker peta (/api/kos/map)
-│   │   │   ├── kos/[id]/route.ts    # Proxy detail kos (/api/kos/[id])
-│   │   │   └── meta/route.ts        # Proxy metadata & fallback kanonis (/api/meta)
-│   │   └── layout.tsx               # Root layout murni: html, body, AuthProvider, favicon
+│   │   ├── (auth)/                  # Rute autentikasi & pemulihan
+│   │   │   ├── masuk/               # Halaman Masuk (/masuk)
+│   │   │   ├── daftar/              # Halaman Pendaftaran (/daftar)
+│   │   │   ├── lupa-sandi/          # Alur pemulihan kata sandi (Gated Service Unavailable)
+│   │   │   ├── reset-sandi/         # Alur atur ulang kata sandi (Gated Service Unavailable)
+│   │   │   ├── verifikasi-email/    # Alur verifikasi email (Gated Service Unavailable)
+│   │   │   ├── tautan-kedaluwarsa/  # Halaman tautan kedaluwarsa (Gated)
+│   │   │   └── akun-dihapus/        # Halaman status akun dihapus (Gated)
+│   │   ├── akun/                    # Portal Akun Pencari (Profil, Notifikasi, Favorit, Pesan)
+│   │   ├── pemilik/                 # Portal Mitra Pemilik (Dashboard & Manajemen Kos)
+│   │   ├── admin/                   # Panel Pengelola/Admin (Moderasi & Antrean Kos)
+│   │   ├── api/                     # Gateway Proxy Server Next.js
+│   │   │   ├── auth/me/route.ts     # Pengecekan sesi anonim/publik
+│   │   │   ├── kos/                 # Proxy listing kos publik & marker peta
+│   │   │   ├── meta/route.ts        # Proxy metadata & fallback kanonis
+│   │   │   └── private/[...path]/   # Session Gateway Same-Origin ke Express Backend
+│   │   └── layout.tsx               # Root layout murni: html, body, AuthProvider, font lokal
 │   ├── components/
-│   │   ├── brand/
-│   │   │   └── BrandLogo.tsx        # Wrapper logo resmi Figma 191:9088 (ukuran 40, 56, 72)
-│   │   ├── layout/
-│   │   │   ├── Navbar.tsx           # Header navigasi publik & status sesi
-│   │   │   └── Footer.tsx           # Footer informasi platform & legalitas
-│   │   ├── kos/
-│   │   │   ├── FilterModal.tsx      # Modal filter dengan validasi harga ketat
-│   │   │   ├── GalleryDialog.tsx    # Lightbox foto dengan focus trap & keyboard listener
-│   │   │   ├── InquiryModal.tsx     # Modal tanya pengelola (transparan, P2 boundary)
-│   │   │   ├── KosCard.tsx          # Kartu ringkasan kos dengan indikator sisa kamar jujur
-│   │   │   ├── KosGrid.tsx          # Grid kartu kos responsif (loading, error, empty)
-│   │   │   ├── LandlordCTA.tsx      # Ajakan pendaftaran pemilik (P2 boundary)
-│   │   │   ├── ResultMap.tsx        # Peta Leaflet dinamis (klien) dengan token warna pin
-│   │   │   └── SearchCapsule.tsx    # Kapsul filter pencarian beranda
-│   │   └── ui/                      # Komponen UI bersama (typed props, typed events, ref forwarding)
-│   │       ├── Badge.tsx
-│   │       ├── Button.tsx
-│   │       ├── Card.tsx
-│   │       ├── Checkbox.tsx
-│   │       ├── Chip.tsx
-│   │       ├── EmptyState.tsx
-│   │       ├── Input.tsx
-│   │       ├── Modal.tsx
-│   │       ├── Select.tsx
-│   │       ├── Skeleton.tsx
-│   │       ├── Toast.tsx
-│   │       └── Toggle.tsx
+│   │   ├── admin/                   # Komponen admin (JavaScript legacy + berkas deklarasi .d.ts)
+│   │   ├── brand/BrandLogo.tsx      # Wrapper logo resmi Figma
+│   │   ├── kos/                     # Komponen listing, filter, modal, dan peta Leaflet
+│   │   ├── layout/                  # Navbar (status sesi & logout handler) dan Footer
+│   │   └── ui/                      # Desain sistem atomik
 │   ├── features/
-│   │   ├── auth/                    # Status sesi & AuthProvider (loading, anonymous, authenticated, unavailable)
-│   │   ├── favorit/                 # STUB: Client favorit & hook useFavorit (P2/P3 boundary)
-│   │   ├── inquiry/                 # STUB: Client tanya pemilik kos (P2 boundary)
-│   │   └── kos/                     # Client pembaca data publik gateway
+│   │   ├── auth/                    # Client sesi cookie, context, dan sessionClient
+│   │   ├── favorit/                 # Integrasi API favorit pencari
+│   │   ├── inquiry/                 # Integrasi API percakapan/tanya pemilik
+│   │   └── kos/                     # Client pembaca data publik
 │   ├── lib/
-│   │   ├── backendClient.ts         # Server-only client ke API_BASE_URL (full-body timeout & pagination reader)
-│   │   ├── formatters.ts            # formatRupiah dan formatDate
-│   │   ├── mapConfig.ts             # Koordinat pusat UGM dan layer OpenStreetMap HTTPS
-│   │   ├── metadataClient.ts        # Fallback kanonis metadata area, fasilitas, dan sorting
-│   │   ├── normalizer.ts            # Runtime normalizer data unknown, gate publik, koordinat null, foto sanitasi
-│   │   └── queryUtils.ts            # Serializer & parser query parameter kanonis dan alias
-│   ├── styles/
-│   │   └── globals.css              # Setup Tailwind v4 (@import "tailwindcss"; & @theme tokens)
-│   └── types/                       # Kontrak data TypeScript terpusat
-│       ├── api.ts
-│       ├── auth.ts
-│       ├── brand.ts
-│       └── kos.ts
+│   │   ├── backendClient.ts         # Server-only client ke upstream API_BASE_URL
+│   │   ├── mapConfig.ts             # Konfigurasi Leaflet & OpenStreetMap (NEXT_PUBLIC_MAP_*)
+│   │   ├── sessionGateway.ts        # Proxy sesi same-origin dengan validasi origin & streaming body
+│   │   └── normalizer.ts            # DTO sanitasi dan normalisasi data eksternal
+│   └── modules/
+│       └── account/                 # Modul portal akun pengguna
 ├── test/
-│   ├── normalizer.test.ts           # Pengujian DTO whitelist, gate publik, koordinat null, sanitasi URL
-│   ├── contract.test.ts             # Pengujian kontrak serialisasi parameter kanonis vs alias
-│   └── backendClient.test.ts        # Pengujian gateway backend client, pagination, timeout body, dan formatters
-├── eslint.config.mjs                # ESLint Flat Config (Next core-web-vitals + @typescript-eslint)
-├── next.config.mjs                  # Konfigurasi Next.js (TypeScript, Image remotePatterns Cloudinary/Unsplash)
-├── package.json                     # Manifest paket exact
-├── postcss.config.mjs               # PostCSS dengan @tailwindcss/postcss 4.3.5
-└── tsconfig.json                    # Konfigurasi TypeScript ketat (@/* -> ./src/*)
+│   ├── normalizer.test.ts           # Pengujian DTO whitelist & sanitasi URL
+│   ├── contract.test.ts             # Pengujian parameter kanonis vs alias
+│   ├── backendClient.test.ts        # Pengujian timeout body & pagination backend
+│   ├── sessionGateway.test.ts       # Pengujian origin guard & cookie forwarding gateway
+│   └── sessionClient.test.ts        # Pengujian CSRF timeout/abort & method normalizer
+├── .env.example                     # Dokumentasi variabel lingkungan frontend
+├── next.config.mjs                  # Konfigurasi Next.js (remotePatterns)
+└── tsconfig.json                    # Konfigurasi TypeScript strict (@/* -> ./src/*)
 ```
 
 ---
 
-## 2. Gate Publik & Aturan Normalizer DTO
+## 2. Status Integrasi Bahasa & Komponen Legacy
 
-Normalizer pada `src/lib/normalizer.ts` menerapkan validasi ketat terhadap data eksternal:
-1. **Gate Status Publikasi & Verifikasi:**
-   - `status_verifikasi` **wajib** bernilai `'approved'` agar listing dapat ditampilkan ke publik. Nilai `pending`, `rejected`, atau hilang/unknown ditolak (`null`).
-   - `status_publikasi` (bila disuplai) **wajib** `'active'` atau `'published'`. Status `draft` atau `archived` otomatis ditolak.
-   - `status_moderasi` (bila disuplai) **wajib** `'normal'` atau `'approved'`. Status `flagged` atau `blocked` ditolak.
-   - Akun pengelola/pemilik yang berstatus `suspended`, `banned`, atau `nonaktif` secara otomatis diblokir dari DTO publik.
-2. **Integritas Field Wajib:**
-   - `nama` wajib berupa string non-kosong.
-   - `harga_per_bulan` wajib berupa angka positif yang valid. Normalizer **tidak memfabrikasi** nilai `0` jika field hilang atau tidak valid (entitas langsung ditolak).
-   - `tipe` wajib `'putra'`, `'putri'`, atau `'campur'`. Normalizer **tidak memfabrikasi** `'putra'` jika field invalid.
-3. **Koordinat & Kuota Kamar:**
-   - Koordinat yang tidak valid atau di luar rentang geografis bumi dinormalisasi menjadi `null` (bukan koordinat `0`).
-   - Ketersediaan kamar unknown dinormalisasi menjadi `null` (tidak difabrikasi sebagai stok penuh).
-4. **Sanitasi URL Foto & Same-Origin Rewrite:**
-   - Memeriksa raw traversal (`..`, `\`, `%2e%2e`, `%5c`) **sebelum** konstruktor `new URL` menormalisasi dot-segments.
-   - URL foto lokal `/uploads/` dipertahankan same-origin (`/uploads/...`) tanpa mengekspos origin internal backend (private host/HTTP di production); perutean ditangani oleh rewrite Next.js pada `next.config.mjs`.
-   - Mendukung domain CDN yang disetujui: Unsplash (`images.unsplash.com`) dan Cloudinary (`res.cloudinary.com`).
-5. **Whitelist DTO Publik & Nested `biaya_detail`:**
-   - Field bersarang `biaya_detail` (`sewa_per_bulan`, `deposit_awal`, `listrik`, `air_wifi`) divalidasi dan di-whitelist secara spesifik tanpa melakukan type-casting pada objek eksternal mentah.
-   - Membuang field rahasia akun pemilik (`password`, `email`, token autentikasi), data internal, dan `catatan_admin`.
+* **TypeScript Strict:** Seluruh rute publik, fitur auth/sesi, modul portal akun pencari, dan portal pemilik kos ditulis dalam TypeScript murni (`strict: true`).
+* **Modul Admin Legacy:** Komponen antarmuka admin pada `src/components/admin/` dan pustaka pendukungnya pada `src/lib/admin*.js` saat ini masih menggunakan format **JavaScript dengan companion declaration files (`.d.ts`)**. Modul ini dipanggil oleh App Router TypeScript secara aman tanpa memicu type error maupun breaking change bagi alur moderasi.
 
 ---
 
-## 3. Format Respons Pagination Backend
+## 3. Autentikasi Sesi & Endpoint Aktual
 
-Backend aktual mengembalikan struktur pagination bersarang:
-```json
-{
-  "success": true,
-  "data": [...],
-  "pagination": {
-    "totalData": 42,
-    "totalPages": 6,
-    "currentPage": 2,
-    "limit": 8
-  }
-}
-```
-Client pada `src/lib/backendClient.ts` dan `src/features/kos/kosClient.ts` mengekstrak `pagination.totalData`, `pagination.totalPages`, `pagination.currentPage`, dan `pagination.limit` secara langsung sehingga navigasi halaman kedua dan seterusnya pada `/jelajah` berjalan presisi.
+Arsitektur autentikasi telah beralih sepenuhnya dari Bearer token manual ke **HTTP-only session cookie (`ss.sid`)** dengan perlindungan token CSRF (`X-CSRF-Token`):
 
----
+1. **Endpoint Sesi Aktual Terhubung:**
+   - `/api/private/auth/csrf`: Pengambilan token CSRF untuk mutasi form non-GET.
+   - `/api/private/auth/me`: Identifikasi pengguna aktif dari sesi cookie.
+   - `/api/private/auth/login`, `/register`, `/logout`: Pengelolaan siklus hidup sesi.
+   - `/api/private/auth/profile`, `/password`, `/notification-preferences`: Pembaruan profil & preferensi.
+   - `/api/private/favorit`: Daftar, simpan, dan hapus kos favorit pencari.
+   - `/api/private/inquiries`: Riwayat pesan dan pengiriman pertanyaan ke pemilik.
+   - `/api/private/notifikasi`: Daftar dan penandaan baca notifikasi.
+   - `/api/private/kos/owner/my-kos`, `/kos`: Pengelolaan listing milik mitra pemilik.
+   - `/api/private/admin/*`: Statistik, antrean verifikasi, dan keputusan moderasi admin.
 
-## 4. Proteksi Timeout Full-Body & Keamanan `/api/auth/me`
-
-1. **Timeout Full-Body:**
-   - Fungsi pembaca data `fetchJsonWithTimeout` menjalankan `res.json()` di dalam waktu hidup timer sebelum `clearTimeout` dipanggil pada blok `finally`. Ini menjamin koneksi yang menggantung (hanging body streaming) dibatalkan secara aman.
-2. **Whitelist `/api/auth/me`:**
-   - Gateway `/api/auth/me` tidak meneruskan data mentah dari backend.
-   - Hanya field terverifikasi (`id`, `nama`, `role`, `status`) yang diteruskan ke klien.
-   - Akun dengan status `suspended` atau `banned` ditolak secara otomatis.
-   - Dilengkapi timeout independen 5000ms.
+2. **Karakteristik Klien `sessionClient`:**
+   - Menormalkan method ke huruf besar (UPPERCASE) secara otomatis.
+   - Timeout terpadu 15 detik mencakup seluruh persiapan token CSRF, permintaan utama, dan pembacaan respons JSON.
+   - Menghormati `AbortSignal` eksternal dan tidak menelan `AbortError` / `TimeoutError` saat streaming payload JSON.
 
 ---
 
-## 5. Prioritas Parameter Query Kanonis & Opsi Pengurutan
+## 4. Batasan Integrasi Nyata & Layanan Belum Aktif
 
-Pada `src/lib/queryUtils.ts` dan route gateway `/api/kos`:
-- Parameter kanonis (`q`, `tipe`, `harga_min`, `harga_max`, `fasilitas`, `kamar_tersedia`, `area_kampus`, `sort`, `page`, `limit`) **selalu menang** atas alias antarmuka lama (`minPrice`, `maxPrice`, `availableOnly`, `area`, `perPage`).
-- Kemenangan parameter kanonis berlaku penuh termasuk untuk nilai `false` (misal: jika `kamar_tersedia=false` dikirimkan bersama `availableOnly=true`, maka nilai `false` kanonis yang menang).
-- Nilai opsi pengurutan (`sort`) backend aktual yang didukung: `terbaru`, `harga_asc` (harga terendah), `harga_desc` (harga tertinggi), dan `kamar_banyak` (sisa kamar terbanyak).
+Sistem berada dalam tahap integrasi aktif dan **tidak semua target kontrak telah terpenuhi penuh**. Beberapa batasan operasional riil saat ini meliputi:
 
----
-
-## 6. Batasan Integrasi Modul Berikutnya (P2/BE Boundary)
-
-1. **Sesi Autentikasi Pengguna (P2 Boundary):**
-   - Backend saat ini belum mengimplementasikan sesi cookie-session terstandar.
-   - `AuthProvider` mengecek `/api/auth/me`. Bila backend belum menyediakan endpoint atau mengembalikan 401/404/503, status diklasifikasikan sebagai `unavailable` atau `anonymous` secara jujur tanpa token di `localStorage` atau login palsu. Gateway memverifikasi bentuk respons valid (`{success, data: user}`, `{data: {user}}`, atau `{user}`), memvalidasi keberadaan `id` dan `role` resmi (`pencari`, `pemilik`, `admin`), serta menolak akun yang ditangguhkan.
-2. **Favorit & Tanya Pemilik (Keterbatasan Integrasi Antarmuka P1):**
-   - **STATUS AKTUAL:** Rute endpoint `backend/src/routes/favoritRoutes.js` dan `inquiryRoutes.js` sudah ada pada backend Express. Namun, endpoint tersebut saat ini masih memerlukan otorisasi berbasis `Bearer <JWT_token>` manual via header dan belum terintegrasi dengan mekanisme cookie-session same-origin atau gateway proxy frontend P1.
-   - Oleh karena itu, modul `favoritClient` dan `inquiryClient` di frontend P1 secara transparan mengembalikan status `unavailable` tanpa token palsu di `localStorage` atau pura-pura tersimpan, hingga fondasi sesi terstandar diselesaikan pada fase autentikasi P2.
-   - Komponen `KosCard` tidak melakukan toggle local state palsu ketika callback `onBookmark` tidak disuplai; tombol favorit diatur dalam status `disabled` dengan keterangan transparan.
-3. **Server Guard Katalog Desain (`/ui`):**
-   - Rute `/ui` dilindungi oleh server guard Next.js. Pada environment `production`, rute ini otomatis mengembalikan `notFound()` (404) kecuali jika environment variable `UI_CATALOG_ENABLED=true` diaktifkan secara eksplisit.
-4. **Font Lokal Tanpa Ketergantungan Unduhan Build:**
-   - Menggunakan paket font lokal `@fontsource-variable/inter` (`5.3.0`) dan `@fontsource-variable/sora` (`5.3.0`) yang diimpor di root layout (`src/app/layout.tsx`).
-   - Menghapus `@import url(https://fonts.googleapis.com/...)` dan `next/font/google` sehingga build produksi dan pengembangan tidak bergantung pada koneksi internet/unduhan font eksternal.
-   - Konfigurasi `@theme` Tailwind CSS v4 dan `:root` mendefinisikan `--font-inter: 'Inter Variable', 'Inter', system-ui, -apple-system, sans-serif;` dan `--font-sora: 'Sora Variable', 'Sora', system-ui, -apple-system, sans-serif;`.
-5. **Ikon Antarmuka (`lucide-react` 1.73.0):**
-   - Menggunakan `lucide-react` versi resmi `1.73.0` yang kompatibel penuh dengan peer dependency React `19.3.0`.
-   - Seluruh impor ikon (`Search`, `Heart`, `MapPin`, `SlidersHorizontal`, `ShieldCheck`, `Home`, `MessageSquare`, `Images`, `User`, `CheckCircle2`, `Clock`, `RotateCcw`, `Menu`, `X`, `ChevronLeft`, `ChevronRight`, `AlertCircle`, `Info`, `SearchX`) telah diverifikasi terhadap named export resmi `lucide-react`.
-6. **Direktori Otoritatif `src/app`:**
-   - Direktori `src/app` adalah satu-satunya direktori rute aktif App Router. Folder `frontend/app` lama telah dipindahkan ke backup di luar repositori.
+1. **Draft Pemilik Kos:**
+   - Penyimpanan draf formulir pendaftaran kos pemilik masih tersimpan pada `localStorage` browser dan belum disinkronkan ke server.
+2. **Penyuntingan Listing Approved:**
+   - Saat listing berstatus `approved` disunting oleh pemilik, status backend kembali berubah menjadi `pending` sehingga listing sementara menghilang dari daftar publik. Mekanisme live snapshot (mempertahankan versi tayang sebelum perubahan disetujui) belum diimplementasikan di backend.
+3. **Kemampuan Moderasi Admin Backend:**
+   - Backend admin saat ini baru mendukung keputusan biner `approve` dan `reject`. Fitur target seperti pelaporan masalah oleh pengguna, permintaan revisi berulang, penangguhan akun (suspend) via UI, serta jejak audit log lengkap belum tersedia di backend.
+4. **Validasi Panjang Kata Sandi Backend vs Target:**
+   - Backend Express saat ini memberlakukan batas sandi maksimal **15 karakter / 72 byte** (bcrypt truncation boundary), berbeda dari target spesifikasi ideal 128 karakter. Frontend menyesuaikan batas tersebut agar formulir tidak memicu error upstream yang membingungkan pengguna.
+5. **Infrastruktur Eksternal Belum Disiapkan:**
+   - Masuk pihak ketiga (OAuth Google/Apple), layanan pengiriman email transaksi nyata (SMTP/SES), integrasi upload langsung Cloudinary di produksi, dan automated pipeline deployment multi-server belum disiapkan.
+6. **Layanan yang Digate (Service Unavailable):**
+   - Rute pemulihan kata sandi (`/lupa-sandi`, `/lupa-sandi/terkirim`, `/reset-sandi`, `/reset-sandi/berhasil`, `/tautan-kedaluwarsa`), verifikasi email (`/verifikasi-email`, `/verifikasi-email/berhasil`, `/verifikasi-email/konfirmasi`), serta penghapusan akun (`/akun-dihapus`) digate secara eksplisit menggunakan komponen `<ServiceUnavailablePage />` dengan tautan kembali ke `/masuk` dan `/akun`. Seluruh implementasi source asli dipertahankan di dalam komponen `Enabled...` pada `RecoveryPages.tsx` dan `StatusPages.tsx` untuk aktivasi mendatang.
 
 ---
 
-## 7. Skrip Verifikasi & Pengujian
+## 5. Konfigurasi Variabel Lingkungan
 
-Jalankan perintah berikut pada terminal setelah dependensi dipasang:
+Salin `.env.example` ke `.env.local` untuk menjalankan frontend di lingkungan lokal:
+
+| Variabel | Keterangan | Nilai Bawaan Lokal |
+| :--- | :--- | :--- |
+| `API_BASE_URL` | URL endpoint RESTful Express backend | `http://127.0.0.1:5000/api` |
+| `APP_ORIGIN` | Origin resmi frontend untuk Same-Origin & CSRF check | `http://localhost:3000` |
+| `UI_CATALOG_ENABLED` | Akses ke rute katalog komponen `/ui` di mode produksi | `false` |
+| `NEXT_PUBLIC_MAP_TILE_URL` | Template URL layer ubin OpenStreetMap HTTPS | `https://tile.openstreetmap.org/{z}/{x}/{y}.png` |
+| `NEXT_PUBLIC_MAP_ATTRIBUTION` | Teks atribusi hak cipta peta OpenStreetMap | Teks atribusi OpenStreetMap kontributor |
+
+---
+
+## 6. Skrip Verifikasi & Pengujian
+
+Jalankan perintah berikut untuk menguji integritas kode:
 
 ```bash
 cd frontend
 
-# 1. Pemasangan dependensi
-npm install
-
-# 2. Pemeriksaan Tipe TypeScript (Strict Mode, allowJs false)
+# 1. Pemeriksaan Tipe TypeScript
 npm run typecheck
 
-# 3. Pemeriksaan Standar ESLint Flat Config (Next core-web-vitals + TypeScript)
+# 2. Pemeriksaan Standar ESLint Flat Config
 npm run eslint
 
-# 4. Pengujian Unit Kontrak, Normalizer DTO, Pagination, dan Timeout Body (Kompatibel Windows PowerShell & CMD)
+# 3. Pengujian Unit Komprehensif (Normalizer, Contract, BackendClient, SessionGateway, SessionClient)
 npm test
 
-# 5. Kompilasi Build Produksi Next.js App Router
+# 4. Kompilasi Build Produksi Next.js App Router
 npm run build
 ```

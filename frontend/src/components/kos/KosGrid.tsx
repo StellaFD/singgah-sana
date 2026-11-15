@@ -88,7 +88,7 @@ export default function KosGrid({
         title="Tidak Ada Kos yang Cocok"
         description={
           emptyMessage ||
-          'Kriteria pencarian atau filter yang Anda pilih saat ini belum memiliki kos yang sesuai di kawasan sekitar kampus UGM.'
+          'Kriteria pencarian atau filter yang Anda pilih saat ini belum memiliki kos yang sesuai di lokasi yang dipilih.'
         }
         actionLabel={onResetFilters ? 'Reset Semua Filter' : undefined}
         onAction={onResetFilters}

@@ -1,0 +1,463 @@
+/* Account feature styles, scoped to preserve public and owner layouts. */
+.account-module { width:100%; }
+/*
+ * Satu-satunya sumber token desain (Kontrak bagian 6).
+ * Nilai diambil dari Figma page `product`. Tailwind 4 membaca blok @theme,
+ * komponen memakai variabel CSS yang sama, sehingga tidak ada nilai ganda.
+ */
+.account-module {
+  --color-brand-50: #f5f3ff;
+  --color-brand-100: #ede9fe;
+  --color-brand-200: #ddd6fe;
+  --color-brand-600: var(--color-brand-primary);
+  --color-brand-700: var(--color-brand-hover);
+
+  --color-ink: #0f172a;
+  --color-muted: #526077; /* kontras 6.3:1 pada putih, 5.8:1 pada slate-50 */
+  --color-line: #e2e8f0;
+  --color-line-strong: #cbd5e1;
+  --color-surface: #ffffff;
+  --color-surface-muted: #f8fafc;
+
+  --color-success-fg: #166534;
+  --color-success-bg: #f0fdf4;
+  --color-danger-fg: #b91c1c;
+  --color-danger-bg: #fef2f2;
+  --color-danger-line: #ef4444;
+
+  --radius-sm: 8px;
+  --radius-md: 16px;
+  --radius-lg: 24px;
+  --radius-pill: 999px;
+
+  --shadow-hover: 0 6px 18px rgb(15 23 42 / 0.08);
+  --shadow-overlay: 0 24px 60px rgb(15 23 42 / 0.22);
+}
+
+.account-module {
+  /* Font dimuat next/font di app/layout.tsx (self-hosted, tanpa permintaan ke Google saat runtime). */
+  --font-sans: var(--font-inter), ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif;
+  --font-display: var(--font-sora), var(--font-inter), ui-sans-serif, system-ui, sans-serif;
+
+  /* Alias semantik untuk CSS komponen. */
+  --c-brand: var(--color-brand-600);
+  --c-brand-soft: var(--color-brand-50);
+  --c-brand-ring: var(--color-brand-100);
+  --c-ink: var(--color-ink);
+  --c-muted: var(--color-muted);
+  --c-line: var(--color-line);
+  --c-surface: var(--color-surface);
+  --c-surface-muted: var(--color-surface-muted);
+
+  --space-1: 4px;
+  --space-2: 8px;
+  --space-3: 12px;
+  --space-4: 16px;
+  --space-6: 24px;
+  --space-8: 32px;
+  --space-12: 48px;
+  --space-16: 64px;
+
+  --page-gutter: 64px;
+  --header-h: 88px;
+}
+
+@media (max-width: 1000px) {
+  .account-module { --page-gutter: 32px; }
+}
+@media (max-width: 640px) {
+  .account-module { --page-gutter: 20px; --header-h: 72px; }
+}
+
+@layer base {
+  .account-module *, .account-module *::before, .account-module *::after { box-sizing: border-box; } /* sama dengan Preflight Tailwind; eksplisit agar tidak bergantung urutan */
+  .account-module {
+    color: var(--c-ink);
+    background: var(--c-surface);
+    font-family: var(--font-sans);
+    font-size: 16px;
+    line-height: 1.5;
+    font-synthesis: none;
+    -webkit-text-size-adjust: 100%;
+  }
+  .account-module { min-width: 320px; min-height: 100dvh; }
+  .account-module img, .account-module svg { max-width: 100%; }
+  .account-module button, .account-module input, .account-module textarea, .account-module select { font: inherit; }
+  .account-module button { cursor: pointer; }
+  .account-module button:disabled { cursor: not-allowed; }
+  .account-module h1, .account-module h2, .account-module h3, .account-module h4 { font-family: var(--font-display); font-weight: 600; margin: 0; }
+  .account-module h1 { font-size: 24px; line-height: 32px; }
+  .account-module h2 { font-size: 20px; line-height: 28px; }
+  .account-module h3 { font-size: 18px; line-height: 26px; }
+  .account-module p { margin: 0; }
+  .account-module ul { list-style: none; margin: 0; padding: 0; }
+  .account-module a { color: inherit; text-decoration: none; }
+
+  /* Fokus keyboard selalu terlihat. */
+  .account-module :focus-visible {
+    outline: 3px solid var(--color-brand-600);
+    outline-offset: 2px;
+    border-radius: 4px;
+  }
+  .account-module main:focus { outline: none; }
+
+  @media (prefers-reduced-motion: reduce) {
+    .account-module *, .account-module *::before, .account-module *::after { animation-duration: 0.001ms !important; transition-duration: 0.001ms !important; scroll-behavior: auto !important; }
+  }
+}
+
+.account-module .h3 { font-size: 20px; line-height: 28px; }
+.account-module .h4 { font-size: 16px; line-height: 24px; }
+.account-module .muted { color: var(--c-muted); }
+.account-module .small { font-size: 14px; line-height: 20px; }
+.account-module .center { display: flex; justify-content: center; }
+.account-module .stack { display: flex; flex-direction: column; gap: var(--space-6); }
+.account-module .stack-lg { display: flex; flex-direction: column; gap: var(--space-6); }
+.account-module .sr-only { position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; border: 0; }
+.account-module .skip-link {
+  position: fixed; top: 8px; left: 8px; z-index: 200;
+  transform: translateY(-200%);
+  padding: 10px 16px; border-radius: 8px; background: var(--c-ink); color: #fff; font-weight: 600;
+}
+.account-module .skip-link:focus { transform: none; }
+.account-module .link {
+  border: 0; padding: 0; background: transparent; color: var(--c-brand);
+  font-weight: 600; font-size: 14px; line-height: 20px; text-align: left; width: fit-content; cursor: pointer;
+}
+.account-module .link:hover { text-decoration: underline; }
+.account-module .link-inline { color: var(--c-brand); text-decoration: underline; }
+.account-module .page-center { min-height: 100dvh; display: grid; place-items: center; }
+
+/* ---------- Tombol ---------- */
+.account-module .btn {
+  min-height: 48px; border-radius: var(--radius-sm); padding: 11px 16px;
+  display: inline-flex; align-items: center; justify-content: center; gap: 8px;
+  border: 1px solid transparent; font-weight: 500; font-size: 16px; line-height: 24px;
+  transition: background-color .15s, box-shadow .15s, transform .15s;
+  text-align: center;
+}
+.account-module .btn:hover:not(:disabled) { box-shadow: var(--shadow-hover); transform: translateY(-1px); }
+.account-module .btn:disabled { opacity: .55; }
+.account-module .btn-block { width: 100%; }
+.account-module .btn-primary { color: #fff; background: var(--c-brand); }
+.account-module .btn-primary:hover:not(:disabled) { background: var(--color-brand-700); }
+.account-module .btn-secondary { color: var(--c-ink); background: var(--c-surface); border-color: var(--color-line-strong); }
+.account-module .btn-ghost { color: var(--c-ink); background: transparent; }
+.account-module .btn-ghost:hover:not(:disabled) { background: var(--c-surface-muted); }
+.account-module .btn-danger { color: #fff; background: var(--color-danger-fg); }
+.account-module .spinner {
+  width: 20px; height: 20px; border-radius: 50%;
+  border: 3px solid var(--color-brand-100); border-top-color: var(--c-brand);
+  animation: spin .8s linear infinite;
+}
+.account-module .spinner-inline { width: 16px; height: 16px; border-width: 2px; border-color: currentColor; border-top-color: transparent; }
+@keyframes spin { to { transform: rotate(360deg); } }
+.account-module .ui-icon { flex: none; }
+
+/* ---------- Form ---------- */
+.account-module .field { display: flex; flex-direction: column; gap: 8px; width: 100%; }
+.account-module .field > label { font-weight: 600; font-size: 14px; line-height: 20px; }
+.account-module .req { color: var(--color-danger-fg); }
+.account-module .control {
+  width: 100%; min-height: 56px; padding: 14px 16px;
+  border: 1px solid var(--color-line-strong); border-radius: var(--radius-sm);
+  background: var(--c-surface); color: var(--c-ink); font-size: 16px; line-height: 24px;
+}
+.account-module .control::placeholder { color: #6b7a90; }
+.account-module .control-area { min-height: 120px; resize: vertical; }
+.account-module .control:focus { outline: none; border-color: var(--c-brand); box-shadow: 0 0 0 3px var(--c-brand-ring); }
+.account-module .field-error .control, .account-module .control[aria-invalid="true"] { border-color: var(--color-danger-line); }
+.account-module .field-note { font-size: 12px; line-height: 18px; color: var(--c-muted); }
+.account-module .field-note-error { color: var(--color-danger-fg); font-size: 13px; }
+.account-module .check { display: flex; gap: 12px; align-items: flex-start; color: var(--c-muted); font-size: 13px; line-height: 20px; cursor: pointer; }
+.account-module .check input { accent-color: var(--c-brand); width: 20px; height: 20px; margin: 0; flex: none; }
+
+/* ---------- Umpan balik ---------- */
+.account-module .alert {
+  border-radius: var(--radius-sm); padding: 12px 16px; display: flex; align-items: flex-start; gap: 12px;
+  color: #5b21b6; background: var(--c-brand-soft); font-size: 14px; line-height: 22px; width: 100%;
+}
+.account-module .alert .ui-icon { margin-top: 1px; }
+.account-module .alert-body { flex: 1; min-width: 0; }
+.account-module .alert-success { color: var(--color-success-fg); background: var(--color-success-bg); }
+.account-module .alert-error { color: var(--color-danger-fg); background: var(--color-danger-bg); }
+.account-module .state-loading { display: flex; align-items: center; gap: 12px; padding: 24px 0; color: var(--c-muted); }
+.account-module .skeleton-block { display: flex; flex-direction: column; gap: 12px; padding: 20px; border: 1px solid var(--c-line); border-radius: var(--radius-md); background: var(--c-surface); }
+.account-module .skeleton-block.p-card { border: 0; min-height: 240px; }
+.account-module .skeleton { display: block; height: 14px; border-radius: 6px; background: linear-gradient(90deg, #eef2f7 25%, #f8fafc 50%, #eef2f7 75%); background-size: 200% 100%; animation: shimmer 1.4s infinite; }
+@keyframes shimmer { to { background-position: -200% 0; } }
+.account-module .empty-state {
+  min-height: 274px; border: 1px solid var(--c-line); border-radius: var(--radius-lg); padding: 24px;
+  display: flex; flex-direction: column; justify-content: center; align-items: center; gap: 16px; text-align: center; background: var(--c-surface);
+}
+.account-module .empty-state p { color: var(--c-muted); max-width: 44ch; }
+.account-module .empty-icon { width: 64px; height: 64px; border-radius: 50%; display: grid; place-items: center; background: var(--c-brand-soft); color: var(--c-brand); }
+.account-module .empty-state-error .empty-icon { background: var(--color-danger-bg); color: var(--color-danger-fg); }
+.account-module .status-icon { width: 56px; height: 56px; border-radius: 50%; display: grid; place-items: center; background: var(--c-brand-soft); color: var(--c-brand); }
+.account-module .status-icon.success { background: var(--color-success-bg); color: var(--color-success-fg); }
+
+/* ---------- Tampilan ---------- */
+.account-module .badge { display: inline-flex; align-items: center; width: fit-content; padding: 4px 12px; border-radius: var(--radius-pill); font-weight: 600; font-size: 12px; line-height: 18px; }
+.account-module .badge-brand { color: #5b21b6; background: var(--c-brand-soft); }
+.account-module .badge-success { color: var(--color-success-fg); background: var(--color-success-bg); }
+.account-module .badge-danger { color: var(--color-danger-fg); background: var(--color-danger-bg); }
+.account-module .badge-neutral { color: var(--c-muted); background: #f1f5f9; }
+.account-module .card { background: var(--c-surface); border: 1px solid var(--c-line); border-radius: var(--radius-lg); padding: 24px; }
+.account-module .avatar { border-radius: 50%; display: inline-flex; align-items: center; justify-content: center; flex: none; object-fit: cover; background: var(--c-brand-soft); color: #5b21b6; font-weight: 600; }
+.account-module .chip { min-height: 44px; padding: 8px 20px; border-radius: var(--radius-pill); border: 1px solid var(--color-line-strong); background: var(--c-surface); color: var(--c-ink); }
+.account-module .chip.active { border-color: var(--c-brand); color: #5b21b6; background: var(--c-brand-soft); font-weight: 600; }
+.account-module .toggle { width: 48px; height: 28px; padding: 3px; border: 0; border-radius: var(--radius-pill); background: #cbd5e1; transition: background-color .2s; flex: none; }
+.account-module .toggle span { display: block; width: 22px; height: 22px; border-radius: 50%; background: #fff; box-shadow: 0 1px 3px #0003; transition: transform .2s; }
+.account-module .toggle.on { background: var(--c-brand); }
+.account-module .toggle.on span { transform: translateX(20px); }
+.account-module .page-heading { display: flex; flex-direction: column; gap: 8px; }
+.account-module .page-heading p { color: var(--c-muted); font-size: 14px; line-height: 22px; }
+
+/* ---------- Dialog & toast ---------- */
+.account-module .dialog-backdrop {
+  position: fixed; inset: 0; z-index: 100; display: grid; place-items: center; padding: 24px;
+  background: rgb(15 23 42 / .5); overflow-y: auto;
+}
+.account-module .dialog {
+  width: min(560px, 100%); max-height: calc(100dvh - 48px); overflow-y: auto;
+  border-radius: var(--radius-lg); padding: 32px; background: var(--c-surface);
+  display: flex; flex-direction: column; gap: 20px; box-shadow: var(--shadow-overlay);
+}
+.account-module .dialog.wide { width: min(600px, 100%); }
+.account-module .dialog:focus { outline: none; }
+.account-module .dialog-desc { color: var(--c-muted); font-size: 14px; line-height: 22px; margin-top: -8px; }
+.account-module .dialog-form { display: flex; flex-direction: column; gap: 20px; }
+.account-module .dialog-actions { display: grid; grid-template-columns: 1fr 1.15fr; gap: 16px; }
+.account-module .dialog-actions .btn { width: 100%; }
+.account-module .dialog-stack { display: flex; flex-direction: column; gap: 12px; align-items: stretch; }
+.account-module .dialog-stack .link { align-self: center; }
+.account-module .upload { border: 1px dashed var(--color-line-strong); border-radius: var(--radius-md); padding: 24px; display: flex; flex-direction: column; align-items: flex-start; gap: 12px; }
+.account-module .upload-preview { width: 96px; height: 96px; border-radius: 50%; object-fit: cover; }
+.account-module .quick-questions { display: flex; flex-direction: column; gap: 8px; }
+.account-module .attach { display: flex; flex-direction: column; gap: 8px; align-items: flex-start; }
+.account-module .file-row { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; width: 100%; padding: 12px; background: var(--c-surface-muted); border-radius: var(--radius-sm); }
+.account-module .file-row > span { flex: 1; min-width: 0; overflow-wrap: anywhere; }
+.account-module .toast-region { position: fixed; z-index: 150; left: 16px; right: 16px; bottom: 16px; display: flex; flex-direction: column; gap: 8px; align-items: flex-end; pointer-events: none; }
+.account-module .toast {
+  pointer-events: auto; display: flex; align-items: center; gap: 12px; max-width: 480px; width: 100%;
+  padding: 12px 16px; border-radius: var(--radius-sm); background: var(--c-ink); color: #fff; font-size: 14px; box-shadow: var(--shadow-overlay);
+}
+.account-module .toast .link { color: #c4b5fd; }
+.account-module .toast-success .ui-icon:first-child { color: #86efac; }
+.account-module .toast-error .ui-icon:first-child { color: #fca5a5; }
+.account-module .toast > span { flex: 1; }
+.account-module .toast-close { border: 0; background: transparent; color: #cbd5e1; display: grid; place-items: center; width: 28px; height: 28px; border-radius: 6px; }
+
+/* ---------- Dev ---------- */
+.account-module .dev-panel {
+  position: fixed; z-index: 160; left: 12px; bottom: 12px; max-width: 260px; padding: 8px 12px;
+  border: 1px solid var(--color-brand-200); border-radius: 12px; background: #ffffffee; font-size: 12px; color: #5b21b6; box-shadow: var(--shadow-overlay);
+}
+.account-module .dev-panel label { display: flex; flex-direction: column; gap: 4px; margin-top: 8px; }
+.account-module .dev-panel select { border: 1px solid var(--c-line); border-radius: 6px; padding: 4px; color: var(--c-ink); background: #fff; }
+.account-module .dev-panel p { margin-top: 8px; color: var(--c-muted); }
+
+.account-module .page { min-height: 100dvh; display: flex; flex-direction: column; background: var(--c-surface); }
+.account-module .account-page { background: var(--c-surface-muted); }
+
+/* ---------- Header ---------- */
+.account-module .auth-header, .account-module .member-header {
+  min-height: var(--header-h); display: flex; align-items: center; justify-content: space-between;
+  gap: 24px; padding: 16px var(--page-gutter); background: var(--c-surface);
+}
+.account-module .auth-header { padding-block: 32px; }
+.account-module .member-header { border-bottom: 1px solid var(--c-line); position: sticky; top: 0; z-index: 40; }
+.account-module .logo { display: block; object-fit: contain; }
+.account-module .main-nav { display: flex; gap: 32px; align-items: center; margin-right: auto; margin-left: 32px; }
+.account-module .main-nav a { padding: 8px 0; border-bottom: 2px solid transparent; }
+.account-module .main-nav a:hover { color: var(--c-brand); }
+.account-module .main-nav a[aria-current="page"] { color: var(--c-brand); border-bottom-color: var(--c-brand); font-weight: 600; }
+.account-module .account-actions { display: flex; align-items: center; gap: 16px; }
+.account-module .icon-button { position: relative; width: 44px; height: 44px; display: grid; place-items: center; border-radius: 50%; }
+.account-module .icon-button:hover { background: var(--c-surface-muted); }
+.account-module .dot-badge {
+  position: absolute; top: 2px; right: 2px; min-width: 18px; height: 18px; padding: 0 5px; border-radius: 9px;
+  background: var(--c-brand); color: #fff; font-size: 11px; line-height: 18px; text-align: center; font-weight: 600;
+}
+.account-module .menu-wrap { position: relative; }
+.account-module .account-trigger { display: flex; align-items: center; gap: 10px; border: 0; background: transparent; padding: 4px 8px 4px 4px; border-radius: var(--radius-pill); min-height: 44px; }
+.account-module .account-trigger:hover { background: var(--c-surface-muted); }
+.account-module .menu {
+  position: absolute; right: 0; top: calc(100% + 8px); z-index: 60; width: 240px; padding: 8px;
+  display: flex; flex-direction: column; gap: 2px; background: var(--c-surface);
+  border: 1px solid var(--c-line); border-radius: var(--radius-md); box-shadow: var(--shadow-overlay);
+}
+.account-module .menu a, .account-module .menu button { display: block; width: 100%; text-align: left; padding: 10px 12px; border: 0; border-radius: 8px; background: transparent; font-size: 14px; }
+.account-module .menu a:hover, .account-module .menu button:hover { background: var(--c-surface-muted); }
+.account-module .menu-head { padding: 8px 12px 10px; display: flex; flex-direction: column; border-bottom: 1px solid var(--c-line); margin-bottom: 4px; overflow-wrap: anywhere; }
+.account-module .menu-head span { color: var(--c-muted); font-size: 12px; }
+.account-module .menu-mobile-only { display: none; flex-direction: column; border-bottom: 1px solid var(--c-line); padding-bottom: 4px; margin-bottom: 4px; }
+
+/* ---------- Footer ---------- */
+.account-module .site-footer {
+  min-height: 104px; display: flex; align-items: center; justify-content: space-between; gap: 24px;
+  padding: 32px var(--page-gutter); margin-top: auto; background: var(--c-surface-muted); border-top: 1px solid var(--c-line);
+}
+.account-module .footer-links { display: flex; gap: 24px; color: var(--c-muted); font-size: 13px; flex-wrap: wrap; }
+.account-module .footer-links a:hover { color: var(--c-brand); text-decoration: underline; }
+
+/* ---------- Auth ---------- */
+.account-module .auth-main {
+  flex: 1; display: grid; grid-template-columns: minmax(0, 640px) minmax(0, 520px);
+  gap: 64px; padding: 32px var(--page-gutter) 64px; justify-content: center; align-items: start;
+}
+.account-module .auth-main-single { grid-template-columns: minmax(0, 520px); }
+.account-module .auth-story {
+  min-height: 560px; border-radius: var(--radius-lg); background: var(--c-brand-soft); padding: 32px;
+  display: flex; flex-direction: column; justify-content: flex-end; gap: 16px;
+}
+.account-module .story-title { font-size: 32px; line-height: 40px; }
+.account-module .auth-story p { color: var(--c-muted); }
+.account-module .auth-story ul { display: grid; gap: 12px; font-size: 14px; margin-top: 8px; }
+.account-module .auth-story li { display: flex; align-items: center; gap: 12px; }
+.account-module .story-icon { color: var(--c-brand); display: grid; place-items: center; }
+.account-module .auth-card {
+  border: 1px solid var(--c-line); border-radius: var(--radius-lg); padding: 32px;
+  display: flex; flex-direction: column; gap: 20px; background: var(--c-surface); min-width: 0;
+}
+.account-module .auth-desc { color: var(--c-muted); font-size: 14px; line-height: 22px; }
+.account-module .auth-alt { color: var(--c-muted); font-size: 14px; }
+.account-module .auth-alt .link { display: inline; }
+
+/* ---------- Konten anggota ---------- */
+.account-module .wide-main { width: min(100%, 1440px); flex: 1; margin-inline: auto; padding: 48px var(--page-gutter); display: flex; flex-direction: column; gap: 24px; }
+.account-module .account-main {
+  flex: 1; display: grid; grid-template-columns: 248px minmax(0, 1032px); gap: 32px;
+  padding: 48px var(--page-gutter); justify-content: center; align-items: start;
+}
+.account-module .sidebar { padding: 16px; background: var(--c-surface); border-radius: var(--radius-md); display: flex; flex-direction: column; gap: 8px; position: sticky; top: calc(var(--header-h) + 16px); }
+.account-module .sidebar-title { font-size: 18px; }
+.account-module .sidebar-sub { color: var(--c-muted); font-size: 14px; margin-bottom: 4px; }
+.account-module .sidebar nav { display: flex; flex-direction: column; gap: 4px; }
+.account-module .sidebar nav a { min-height: 44px; border-radius: 8px; padding: 10px 12px; display: flex; align-items: center; gap: 12px; font-size: 14px; }
+.account-module .sidebar nav a:hover { background: var(--c-surface-muted); }
+.account-module .sidebar nav a[aria-current="page"] { color: #5b21b6; background: var(--c-brand-soft); font-weight: 600; }
+.account-module .account-content { min-width: 0; display: flex; flex-direction: column; gap: 24px; }
+
+/* ---------- Responsif: 1440 → 768 → 375 ---------- */
+@media (max-width: 1000px) {
+  .account-module .auth-main { grid-template-columns: minmax(0, 560px); }
+  .account-module .auth-story { display: none; }
+  .account-module .main-nav { display: none; }
+  .account-module .menu-mobile-only { display: flex; }
+  .account-module .account-name { display: none; }
+  .account-module .account-main { grid-template-columns: minmax(0, 1fr); gap: 16px; padding-top: 16px; }
+  .account-module .sidebar { position: sticky; top: var(--header-h); z-index: 30; flex-direction: row; align-items: center; padding: 8px; overflow-x: auto; border: 1px solid var(--c-line); }
+  .account-module .sidebar-title, .account-module .sidebar-sub, .account-module .sidebar > .btn { display: none; }
+  .account-module .sidebar nav { flex-direction: row; }
+  .account-module .sidebar nav a { white-space: nowrap; }
+}
+@media (max-width: 640px) {
+  .account-module .auth-header { padding-block: 16px; }
+  .account-module .auth-card { border: 0; padding: 8px 0; }
+  .account-module .site-footer { flex-direction: column; align-items: flex-start; gap: 16px; padding-block: 24px; }
+  .account-module .footer-links { gap: 8px 16px; }
+  .account-module .account-actions { gap: 4px; }
+  .account-module .wide-main, .account-module .account-main { padding-block: 24px; }
+}
+
+/* ---------- Ringkasan & kartu kos ---------- */
+.account-module .stats { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 24px; }
+.account-module .stats .card { display: flex; flex-direction: column; gap: 16px; height: 100%; }
+.account-module .stat-num { font-family: var(--font-display); font-weight: 700; font-size: 32px; line-height: 40px; }
+.account-module .action-card { display: flex; flex-direction: column; align-items: flex-start; gap: 16px; }
+.account-module .action-card .btn { min-width: 220px; }
+.account-module .properties { display: grid; grid-template-columns: repeat(auto-fill, minmax(min(100%, 280px), 1fr)); gap: 24px; }
+.account-module .property-card { height: 100%; overflow: hidden; background: var(--c-surface); border: 1px solid var(--c-line); border-radius: var(--radius-md); display: flex; flex-direction: column; }
+.account-module .property-image { position: relative; aspect-ratio: 3 / 2; background: #e2e8f0; }
+.account-module .property-image > img { width: 100%; height: 100%; object-fit: cover; display: block; }
+.account-module .on-image { position: absolute; top: 12px; left: 12px; background: var(--c-surface); }
+.account-module .fav-button { position: absolute; top: 8px; right: 8px; width: 44px; height: 44px; border: 0; border-radius: 50%; color: var(--c-brand); background: var(--c-surface); display: grid; place-items: center; }
+.account-module .fav-button:hover:not(:disabled) { background: var(--c-brand-soft); }
+.account-module .fav-button:disabled { opacity: .5; }
+.account-module .property-info { padding: 16px; display: flex; flex-direction: column; gap: 8px; flex: 1; }
+.account-module .property-info h3 { font-size: 16px; line-height: 24px; }
+.account-module .property-info h3 a:hover { color: var(--c-brand); text-decoration: underline; }
+.account-module .verified { color: var(--color-success-fg); display: flex; align-items: center; gap: 8px; font-size: 14px; }
+.account-module .price strong { font-size: 20px; }
+.account-module .card-actions { margin-top: auto; padding-top: 8px; display: flex; flex-direction: column; gap: 8px; align-items: flex-start; }
+.account-module .card-actions .btn { width: 100%; min-height: 44px; }
+.account-module .inactive-card .property-image > img { filter: grayscale(.6); opacity: .75; }
+.account-module .inactive-card .property-info h3, .account-module .inactive-card .price { opacity: .8; }
+
+/* ---------- Profil ---------- */
+.account-module .profile-card { display: flex; flex-direction: column; gap: 24px; }
+.account-module .photo-row { display: flex; gap: 24px; align-items: center; }
+.account-module .photo-row > div { display: flex; flex-direction: column; align-items: flex-start; gap: 8px; }
+.account-module .form-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 24px; }
+.account-module .email-status { display: flex; align-items: center; gap: 16px; flex-wrap: wrap; overflow-wrap: anywhere; }
+
+/* ---------- Filter, notifikasi, preferensi ---------- */
+.account-module .filters { display: flex; gap: 12px; align-items: flex-end; flex-wrap: wrap; }
+.account-module .filters-sort { margin-left: auto; min-width: 200px; }
+.account-module .filters-sort .control { min-height: 44px; padding-block: 8px; }
+.account-module .filters .btn { min-height: 44px; }
+.account-module .notification-list { display: grid; gap: 16px; }
+.account-module .notification { width: 100%; display: flex; gap: 16px; text-align: left; color: var(--c-ink); align-items: flex-start; }
+.account-module .notification:hover { border-color: var(--color-brand-200); }
+.account-module .notification.unread { border-color: var(--color-brand-200); background: #faf8ff; }
+.account-module .notif-icon { color: var(--c-brand); flex: none; margin-top: 2px; }
+.account-module .notif-body { display: flex; flex-direction: column; gap: 4px; min-width: 0; }
+.account-module .preferences { display: flex; flex-direction: column; gap: 24px; }
+.account-module .preference { display: flex; justify-content: space-between; align-items: center; gap: 16px; }
+.account-module .preference > div { display: grid; gap: 4px; }
+
+/* ---------- Pesan ---------- */
+.account-module .messages-layout { display: grid; grid-template-columns: minmax(280px, 380px) minmax(0, 1fr); gap: 24px; align-items: start; }
+.account-module .conversation-list { border: 1px solid var(--c-line); border-radius: var(--radius-lg); padding: 20px; display: flex; flex-direction: column; gap: 12px; background: var(--c-surface); }
+.account-module .conversation-list ul { display: flex; flex-direction: column; gap: 4px; }
+.account-module .search { background: var(--c-surface-muted); border-radius: var(--radius-sm); padding: 0 12px; display: flex; align-items: center; gap: 8px; color: var(--c-muted); }
+.account-module .search input { flex: 1; min-width: 0; border: 0; background: transparent; padding: 12px 0; font-size: 14px; color: var(--c-ink); }
+.account-module .search input:focus { outline: none; }
+.account-module .search:focus-within { box-shadow: 0 0 0 3px var(--c-brand-ring); }
+.account-module .conversation { border-radius: var(--radius-md); padding: 14px 16px; background: transparent; display: flex; flex-direction: column; gap: 4px; }
+.account-module .conversation:hover { background: var(--c-surface-muted); }
+.account-module .conversation.active { background: var(--c-brand-soft); }
+.account-module .conversation span, .account-module .conversation small { color: var(--c-muted); font-size: 13px; }
+.account-module .conversation b { font-size: 12px; font-weight: 600; }
+.account-module .conversation span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.account-module .unread-dot { display: inline-block; width: 8px; height: 8px; border-radius: 50%; background: var(--c-brand); margin-left: 8px; }
+.account-module .chat { display: flex; flex-direction: column; gap: 20px; min-width: 0; }
+.account-module .chat-placeholder { min-height: 200px; display: grid; place-items: center; }
+.account-module .chat-person { display: flex; gap: 12px; align-items: center; border-bottom: 1px solid var(--c-line); padding-bottom: 16px; }
+.account-module .chat-title { font-size: 18px; }
+.account-module .back-link { display: none; width: 44px; height: 44px; place-items: center; border-radius: 50%; margin-left: -8px; }
+.account-module .back-link:hover { background: var(--c-surface-muted); }
+.account-module .related { background: var(--c-surface-muted); border-radius: var(--radius-md); padding: 16px; display: flex; gap: 16px; align-items: center; }
+.account-module .related img { width: 96px; height: 72px; object-fit: cover; border-radius: 12px; flex: none; }
+.account-module .related > div { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+.account-module .thread { display: flex; flex-direction: column; gap: 12px; max-height: 420px; overflow-y: auto; padding: 4px; }
+.account-module .bubble { max-width: min(560px, 88%); padding: 12px 16px; border-radius: var(--radius-sm); display: flex; flex-direction: column; gap: 6px; overflow-wrap: anywhere; }
+.account-module .bubble.outgoing { align-self: flex-end; background: var(--c-brand-soft); }
+.account-module .bubble.incoming { align-self: flex-start; background: var(--c-surface-muted); }
+.account-module .bubble small { color: var(--c-muted); font-size: 12px; }
+.account-module .bubble small .link { font-size: 12px; display: inline; }
+.account-module .composer { display: flex; flex-direction: column; gap: 12px; }
+.account-module .send-row { display: flex; justify-content: space-between; align-items: center; gap: 12px; }
+.account-module .send-row .btn { min-width: 160px; }
+
+@media (max-width: 1000px) {
+  .account-module .stats { grid-template-columns: 1fr; gap: 16px; }
+  .account-module .messages-layout { grid-template-columns: minmax(0, 1fr); }
+  .account-module .messages-layout[data-view="chat"] .conversation-list { display: none; }
+  .account-module .messages-layout[data-view="list"] .chat-placeholder { display: none; }
+  .account-module .back-link { display: grid; }
+}
+@media (max-width: 640px) {
+  .account-module .form-grid { grid-template-columns: 1fr; gap: 16px; }
+  .account-module .photo-row { align-items: flex-start; }
+  .account-module .card { padding: 20px; border-radius: 18px; }
+  .account-module .filters-sort { margin-left: 0; width: 100%; }
+  .account-module .action-card .btn { width: 100%; }
+  .account-module .related { align-items: flex-start; }
+  .account-module .dialog-backdrop { padding: 0; align-items: end; }
+  .account-module .dialog { width: 100%; max-height: 100dvh; border-radius: 24px 24px 0 0; padding: 24px 20px; }
+  .account-module .dialog-actions { grid-template-columns: 1fr; }
+  .account-module .dialog-actions .btn:first-child { order: 2; }
+  .account-module .send-row .btn { min-width: 0; }
+}

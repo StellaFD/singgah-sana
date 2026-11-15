@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState, type ReactNode } from 'react';
 import Link from 'next/link';
+import BrandLogo from '@/components/brand/BrandLogo';
 import {
   Activity,
   ChevronRight,
@@ -9,7 +10,6 @@ import {
   LayoutDashboard,
   LogOut,
   Menu,
-  ShieldCheck,
   Users,
   X,
   type LucideIcon,
@@ -141,12 +141,10 @@ export default function AdminLayout({
         )}
       >
         <div className="flex h-20 items-center gap-3 border-b border-slate-100 px-6">
-          <span className="flex h-10 w-10 items-center justify-center rounded-xl bg-indigo-700 text-white">
-            <ShieldCheck aria-hidden="true" size={22} />
-          </span>
+          <Link href="/" aria-label="Beranda Singgah Sana"><BrandLogo size={40}/></Link>
           <div>
-            <p className="font-bold tracking-tight">Singgah-sana</p>
-            <p className="text-xs text-slate-500">Ruang admin</p>
+            <p className="font-bold tracking-tight">Ruang admin</p>
+            <p className="text-xs text-slate-500">Moderasi portal kos</p>
           </div>
           <button
             aria-label="Tutup menu navigasi"
@@ -170,7 +168,7 @@ export default function AdminLayout({
         </nav>
 
         <div className="mt-auto border-t border-slate-100 px-6 py-4 text-xs text-slate-500">
-          FE04 · Admin &amp; Moderasi
+          Administrasi Singgah Sana
         </div>
       </aside>
 

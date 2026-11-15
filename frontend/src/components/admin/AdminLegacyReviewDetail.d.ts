@@ -1,6 +1,6 @@
 type AdminLegacyReviewDetailProps = {
   expireSession: () => void;
-  token: string;
+  token: string | undefined;
 };
 
 export default function AdminLegacyReviewDetail(
