@@ -2,6 +2,7 @@ const express = require('express');
 const router = express.Router();
 const {
   getAllKosPublic,
+  getKosMapPublic,
   getKosById,
   createKos,
   getMyKos,
@@ -13,6 +14,7 @@ const { authorize } = require('../middlewares/roleMiddleware');
 const upload = require('../middlewares/uploadMiddleware');
 
 router.get('/', getAllKosPublic);
+router.get('/map', getKosMapPublic);
 router.get('/owner/my-kos', protect, authorize('pemilik'), getMyKos);
 router.get('/:id', optionalProtect, getKosById);
 router.post(

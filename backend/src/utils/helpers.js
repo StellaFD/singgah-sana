@@ -19,6 +19,33 @@ const parsePagination = (page, limit, defaultLimit = 10, maxLimit = 100) => {
   return { pageNum, limitNum, skip: (pageNum - 1) * limitNum };
 };
 
+// Memeriksa dan mem-parse nilai numerik skalar finite ketat.
+// Menolak: undefined, null, boolean, array, object, string kosong/whitespace, NaN, Infinity, -Infinity.
+const parseStrictNumber = (val) => {
+  if (typeof val === 'number') {
+    return Number.isFinite(val) ? val : null;
+  }
+  if (typeof val === 'string') {
+    const trimmed = val.trim();
+    if (!trimmed) return null;
+    if (!/^[-+]?(\d+(\.\d*)?|\.\d+)([eE][-+]?\d+)?$/.test(trimmed)) {
+      return null;
+    }
+    const n = Number(trimmed);
+    return Number.isFinite(n) ? n : null;
+  }
+  return null;
+};
+
+// Memeriksa dan mem-parse koordinat geografis ketat dalam rentang min dan max.
+// Menerima angka 0 dan numeric string non-blank dalam rentang [min, max].
+// Menolak: null, boolean, array, object, whitespace, NaN, Infinity, dan angka di luar rentang.
+const parseStrictCoordinate = (val, min, max) => {
+  const n = parseStrictNumber(val);
+  if (n === null) return null;
+  return n >= min && n <= max ? n : null;
+};
+
 // Mengubah nilai menjadi angka, atau undefined jika tidak valid.
 const toNumberOrUndefined = (val) => {
   if (val === undefined || val === null || val === '') return undefined;
@@ -34,4 +61,12 @@ const csvCell = (val) => {
   return `"${s.replace(/"/g, '""')}"`;
 };
 
-module.exports = { escapeRegex, safeSearchTerm, parsePagination, toNumberOrUndefined, csvCell };
+module.exports = {
+  escapeRegex,
+  safeSearchTerm,
+  parsePagination,
+  parseStrictNumber,
+  parseStrictCoordinate,
+  toNumberOrUndefined,
+  csvCell,
+};
