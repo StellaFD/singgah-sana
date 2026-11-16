@@ -116,7 +116,8 @@ export function InquiryThread({ inquiry, onReplied }: InquiryThreadProps) {
             >
               <p className="whitespace-pre-line text-[15px]">{m.teks}</p>
               <p className="mt-2 text-xs text-ink-muted">
-                {isMe ? 'Anda' : pencari?.nama ?? 'Calon penghuni'} · {formatDate(m.createdAt)} · {formatRelativeShort(m.createdAt)}
+                {isMe ? 'Anda' : pencari?.nama ?? 'Calon penghuni'}
+                {m.createdAt ? ` · ${formatDate(m.createdAt)} · ${formatRelativeShort(m.createdAt)}` : ' · Waktu tidak tercatat'}
               </p>
             </div>
           );

@@ -88,17 +88,17 @@ inquirySchema.virtual('riwayat_pesan').get(function () {
       pengirim_id: this.pencari_id?._id || this.pencari_id,
       pengirim_role: 'pencari',
       teks: this.pesan,
-      createdAt: this.createdAt || new Date(),
+      createdAt: this.createdAt || null,
     });
   }
-  // 2. Balasan awal dari pemilik (jika ada pada format legacy, gunakan balasan_at yang stabil)
+  // 2. Balasan awal dari pemilik (jika ada pada format legacy, gunakan balasan_at stabil; jika tidak tercatat, kembalikan null tanpa mengarang waktu)
   if (this.balasan) {
     hasil.push({
       _id: `${this._id}-1`,
       pengirim_id: this.pemilik_id?._id || this.pemilik_id,
       pengirim_role: 'pemilik',
       teks: this.balasan,
-      createdAt: this.balasan_at || this.updatedAt || this.createdAt || new Date(),
+      createdAt: this.balasan_at || null,
     });
   }
   // 3. Pesan-pesan berikutnya dari array pesan_list
@@ -109,7 +109,7 @@ inquirySchema.virtual('riwayat_pesan').get(function () {
         pengirim_id: p.pengirim_id?._id || p.pengirim_id,
         pengirim_role: p.pengirim_role,
         teks: p.teks,
-        createdAt: p.createdAt,
+        createdAt: p.createdAt || null,
       });
     });
   }

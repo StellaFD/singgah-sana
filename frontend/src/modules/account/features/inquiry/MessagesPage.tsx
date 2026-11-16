@@ -187,7 +187,7 @@ function Thread({ conv, onActivity }: { conv: Percakapan; onActivity: () => void
           <div key={m.id} className={`bubble ${m.dari === "saya" ? "outgoing" : "incoming"}`}>
             <span>{m.isi}</span>
             <small>
-              {formatClock(m.waktu)}
+              {m.waktu ? formatClock(m.waktu) : "Waktu tidak tercatat"}
               {m.dari === "saya" && ` · ${m.state === "sending" ? "Mengirim…" : m.state === "failed" ? "Gagal terkirim" : "Terkirim"}`}
               {m.state === "failed" && <> · <button type="button" className="link" onClick={() => send(m.isi, m.id)}>Kirim ulang</button></>}
             </small>
