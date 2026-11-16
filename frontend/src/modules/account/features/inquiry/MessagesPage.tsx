@@ -91,6 +91,27 @@ function Thread({ conv, onActivity }: { conv: Percakapan; onActivity: () => void
   const endRef = useRef<HTMLDivElement>(null);
   const full = conv.kos.kamarTersedia === 0;
 
+  // Polling pembaruan berkala hanya saat tab/halaman aktif (setiap 3.5 detik)
+  useEffect(() => {
+    let timer: NodeJS.Timeout | null = null;
+    const poll = () => {
+      if (document.visibilityState === "visible") {
+        void msgs.reload();
+        onActivity();
+      }
+    };
+    const handleVisibility = () => {
+      if (document.visibilityState === "visible") {
+        poll();
+      }
+    };
+    timer = setInterval(poll, 3500);
+    document.addEventListener("visibilitychange", handleVisibility);
+    return () => {
+      if (timer) clearInterval(timer);
+      document.removeEventListener("visibilitychange", handleVisibility);
+    };
+  }, [conv.id, msgs, onActivity]);
 
   useEffect(() => { endRef.current?.scrollIntoView({ block: "nearest" }); }, [local.length, msgs.status]);
 
@@ -102,7 +123,7 @@ function Thread({ conv, onActivity }: { conv: Percakapan; onActivity: () => void
       const saved = await inquiryApi.send(conv.id, text);
       setLocal((l) => l.map((m) => (m.id === id ? { ...saved } : m)));
       onActivity();
-      navigate(`/pesan?c=${saved.id}`, {replace:true,force:true});
+      void msgs.reload();
     } catch {
       setLocal((l) => l.map((m) => (m.id === id ? { ...m, state: "failed" } : m)));
     }
@@ -147,7 +168,7 @@ function Thread({ conv, onActivity }: { conv: Percakapan; onActivity: () => void
             <span>{m.isi}</span>
             <small>
               {formatClock(m.waktu)}
-              {m.dari === "saya" && ` · ${m.state === "sending" ? "Mengirim…" : m.state === "failed" ? "Gagal terkirim" : m.status === "dibaca" ? "Dibaca" : "Terkirim"}`}
+              {m.dari === "saya" && ` · ${m.state === "sending" ? "Mengirim…" : m.state === "failed" ? "Gagal terkirim" : "Terkirim"}`}
               {m.state === "failed" && <> · <button type="button" className="link" onClick={() => send(m.isi, m.id)}>Kirim ulang</button></>}
             </small>
           </div>
@@ -156,14 +177,13 @@ function Thread({ conv, onActivity }: { conv: Percakapan; onActivity: () => void
         <div ref={endRef} />
       </div>
 
-      <div className="composer"><Button variant="secondary" onClick={() => {msgs.reload();onActivity();}}>Muat ulang balasan</Button></div>
-      {conv.status === 'menunggu' ? <Alert>Pertanyaan sudah terkirim. Tunggu balasan pemilik sebelum mengirim pertanyaan baru.</Alert> : <form onSubmit={submit} noValidate className="composer">
+      <form onSubmit={submit} noValidate className="composer">
         <TextArea label="Pesan untuk pemilik" name="isi" placeholder="Tulis pesanmu" value={draft} onChange={(v) => { setDraft(v); setDraftError(undefined); }} error={draftError} rows={3} maxLength={limits.messageMaxLength} />
         <div className="send-row">
           <small className="muted" aria-live="off">{draft.length.toLocaleString("id-ID")} / {limits.messageMaxLength.toLocaleString("id-ID")} karakter</small>
           <Button type="submit">Kirim pesan</Button>
         </div>
-      </form>}
+      </form>
     </Card>
   );
 }

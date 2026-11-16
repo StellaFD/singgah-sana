@@ -12,6 +12,8 @@ const routes: Array<[RegExp, string[]]> = [
   [/^favorit$/, ['GET']],
   [/^favorit\/[a-f\d]{24}$/, ['PUT', 'DELETE']],
   [/^inquir(?:y|ies)(?:\/(my|owner))?$/, ['GET', 'POST']],
+  [/^inquir(?:y|ies)\/[a-f\d]{24}$/, ['GET']],
+  [/^inquir(?:y|ies)\/[a-f\d]{24}\/messages$/, ['POST']],
   [/^inquir(?:y|ies)\/[a-f\d]{24}\/reply$/, ['PATCH']],
   [/^pemilik\/kos$/, ['GET', 'POST']],
   [/^pemilik\/kos\/[a-f\d]{24}$/, ['GET', 'PATCH', 'DELETE']],

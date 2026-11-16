@@ -7,7 +7,7 @@ import { Button } from '@/components/owner-ui/button';
 import { Field, Textarea, describedBy } from '@/components/owner-ui/field';
 import { useToast } from '@/components/owner-ui/toast';
 import { errorMessage } from '@/lib/owner/api/client';
-import { balasInquiry } from '../api';
+import { balasInquiry, kirimPesanPemilik } from '../api';
 import { balasanSchema, type BalasanValues } from '../schema';
 import type { OwnerInquiry } from '../types';
 
@@ -34,11 +34,24 @@ export function ReplyForm({ inquiry, onReplied }: ReplyFormProps) {
 
   const onSubmit = handleSubmit(async (values) => {
     try {
-      const result = await balasInquiry(inquiry._id, values.balasan.trim());
-      // Respons balasan tidak mem-populate kos/pencari, jadi gabungkan dengan data yang sudah ada.
-      onReplied({ ...inquiry, balasan: result.data.balasan, status: result.data.status, updatedAt: result.data.updatedAt });
+      const teks = values.balasan.trim();
+      if (inquiry.status === 'menunggu' && !inquiry.balasan) {
+        // Balasan pertama menggunakan endpoint reply kanonikal
+        const result = await balasInquiry(inquiry._id, teks);
+        onReplied({ ...inquiry, balasan: result.data.balasan, status: result.data.status, updatedAt: result.data.updatedAt });
+      } else {
+        // Pesan lanjutan menggunakan endpoint messages multi-turn
+        const result = await kirimPesanPemilik(inquiry._id, teks);
+        const existingList = inquiry.pesan_list || [];
+        onReplied({
+          ...inquiry,
+          status: 'dibalas',
+          pesan_list: [...existingList, result.data],
+          updatedAt: result.data.createdAt,
+        });
+      }
       reset();
-      toast.success('Balasan terkirim.');
+      toast.success('Pesan balasan terkirim.');
     } catch (error) {
       setError('balasan', { type: 'server', message: errorMessage(error) });
     }
@@ -46,11 +59,11 @@ export function ReplyForm({ inquiry, onReplied }: ReplyFormProps) {
 
   return (
     <form onSubmit={onSubmit} noValidate className="flex flex-col gap-3">
-      <Field id="balasan" label="Balasan" hint={`Balasan hanya bisa dikirim sekali. ${length}/1.000`} error={errors.balasan?.message}>
+      <Field id="balasan" label="Balasan untuk calon penghuni" hint={`${length}/1.000 karakter`} error={errors.balasan?.message}>
         <Textarea
           id="balasan"
-          rows={4}
-          placeholder="Tulis balasan untuk calon penghuni…"
+          rows={3}
+          placeholder="Tulis balasan atau pesan untuk calon penghuni…"
           invalid={!!errors.balasan}
           aria-describedby={describedBy('balasan', errors.balasan?.message, true)}
           {...register('balasan')}

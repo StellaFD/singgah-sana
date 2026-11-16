@@ -112,7 +112,7 @@ export interface Percakapan {
 export type PesanStatus = "terkirim" | "dibaca";
 export interface Pesan {
   id: string;
-  dari: "saya" | "pemilik";
+  dari: "saya" | "lawan";
   isi: string;
   waktu: string;
   status: PesanStatus;
