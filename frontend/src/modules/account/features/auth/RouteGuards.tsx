@@ -4,6 +4,7 @@ import { useEffect, type ReactNode } from "react";
 import { Spinner } from "../../components/ui/Feedback";
 import { navigate, useLocation } from "../../lib/router";
 import { useAuth } from "./AuthContext";
+import { resolvePostAuthRedirect } from "@/lib/authRedirect";
 
 /**
  * Pemeriksaan sesi di klien hanya untuk pengalaman pengguna (arahkan ke halaman yang tepat).
@@ -18,11 +19,15 @@ export function Redirect({ to }: { to: string }) {
   return <FullPageSpinner />;
 }
 
-/** Halaman untuk tamu (masuk, daftar, lupa sandi). Pengguna yang sudah masuk dialihkan ke akun. */
+/** Halaman untuk tamu (masuk, daftar, lupa sandi). Pengguna yang sudah masuk dialihkan sesuai peran dan target. */
 export function GuestOnly({ children }: { children: ReactNode }) {
   const { status, user } = useAuth();
+  const { query } = useLocation();
   if (status === "loading") return <FullPageSpinner />;
-  if (status === "authenticated") return <Redirect to={user?.role==='pemilik'?'/pemilik':user?.role==='admin'?'/admin':'/akun'} />;
+  if (status === "authenticated" && user) {
+    const target = resolvePostAuthRedirect(user.role, query.get("next"));
+    return <Redirect to={target} />;
+  }
   return <>{children}</>;
 }
 

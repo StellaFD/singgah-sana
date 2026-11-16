@@ -3,7 +3,6 @@
 import type { ReactNode } from "react";
 import { useAuth } from "../../features/auth/AuthContext";
 import { useLogoutRequest } from "../../features/auth/LogoutDialog";
-import { externalPaths } from "../../lib/config";
 import { useLocation } from "../../lib/router";
 import { Button, ButtonLink } from "../ui/Button";
 import { Icon, type IconName } from "../ui/Icon";
@@ -24,7 +23,8 @@ export function AccountLayout({ children }: { children: ReactNode }) {
   const { path } = useLocation();
   const { user } = useAuth();
   const requestLogout = useLogoutRequest();
-  const isOwner = user?.role === "pemilik" || user?.role === "admin";
+  const isOwner = user?.role === "pemilik";
+  const isAdmin = user?.role === "admin";
   return (
     <div className="page account-page">
       <MemberHeader />
@@ -40,7 +40,8 @@ export function AccountLayout({ children }: { children: ReactNode }) {
               </Link>
             ))}
           </nav>
-          {isOwner && <ButtonLink to={externalPaths.ownerSpace} external variant="secondary" block>Ruang pemilik</ButtonLink>}
+          {isOwner && <ButtonLink to="/pemilik" external variant="secondary" block>Ruang pemilik</ButtonLink>}
+          {isAdmin && <ButtonLink to="/admin" external variant="secondary" block>Ruang admin</ButtonLink>}
           <Button variant="ghost" block onClick={requestLogout}>Keluar</Button>
         </aside>
         <MainRegion routeKey={path} className="account-content">

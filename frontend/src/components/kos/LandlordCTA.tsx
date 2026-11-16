@@ -1,11 +1,38 @@
 'use client';
 
 import React, { useState } from 'react';
+import { useRouter } from 'next/navigation';
 import Button from '@/components/ui/Button';
 import Modal from '@/components/ui/Modal';
+import { useAuth } from '@/features/auth/AuthContext';
 
 export default function LandlordCTA() {
+  const auth = useAuth();
+  const router = useRouter();
   const [modalOpen, setModalOpen] = useState(false);
+
+  const handleClick = () => {
+    if (!auth.isAuthenticated) {
+      router.push('/daftar?role=pemilik&next=' + encodeURIComponent('/pemilik/kos/baru'));
+      return;
+    }
+
+    if (auth.user?.role === 'pemilik') {
+      router.push('/pemilik/kos/baru');
+      return;
+    }
+
+    // Peran aktif bukan pemilik (pencari atau admin)
+    setModalOpen(true);
+  };
+
+  const handleSwitchToOwnerLogin = () => {
+    setModalOpen(false);
+    router.push('/masuk?role=pemilik&next=' + encodeURIComponent('/pemilik/kos/baru'));
+  };
+
+  const currentRoleLabel =
+    auth.user?.role === 'admin' ? 'Administrator' : 'Pencari Kos';
 
   return (
     <>
@@ -20,26 +47,32 @@ export default function LandlordCTA() {
           variant="primary"
           size="md"
           className="h-12 w-60 font-medium text-base"
-          onClick={() => setModalOpen(true)}
+          onClick={handleClick}
         >
           Mulai daftarkan kos
         </Button>
       </section>
 
-      {/* Honest Landlord Module Modal */}
+      {/* Modal Pemisahan Peran Tunggal */}
       <Modal
         isOpen={modalOpen}
         onClose={() => setModalOpen(false)}
-        title="Pendaftaran Properti Pemilik Kos"
-        description="Informasi Pendaftaran Pemilik Kos"
+        title="Pendaftaran Khusus Pemilik Kos"
+        description="Pemberitahuan Peran Akun"
       >
         <div className="space-y-4">
-          <p className="text-sm text-ink-muted leading-relaxed">
-            Portal pemilik kos untuk pendaftaran listing properti mandiri dan verifikasi dokumen legalitas saat ini sedang dalam tahap persiapan integrasi backend (tahap P2). Pilihan belum dapat diproses secara langsung melalui antarmuka web.
+          <p className="text-sm text-ink leading-relaxed">
+            Akun Anda saat ini tercatat sebagai <strong>{currentRoleLabel}</strong>. Sistem Singgah Sana memisahkan peran akun secara terpisah agar hak akses dan data tetap aman.
           </p>
-          <div className="flex justify-end pt-2">
-            <Button variant="primary" size="sm" onClick={() => setModalOpen(false)}>
-              Mengerti
+          <p className="text-sm text-ink-muted leading-relaxed">
+            Untuk mendaftarkan dan mempublikasikan kos baru, silakan masuk atau daftar menggunakan akun khusus pemilik kos.
+          </p>
+          <div className="flex justify-end gap-2 pt-2">
+            <Button variant="secondary" size="sm" onClick={() => setModalOpen(false)}>
+              Batal
+            </Button>
+            <Button variant="primary" size="sm" onClick={handleSwitchToOwnerLogin}>
+              Masuk Akun Pemilik
             </Button>
           </div>
         </div>

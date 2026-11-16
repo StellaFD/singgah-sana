@@ -23,8 +23,7 @@ const NAV = [
   { href: '/pemilik/pesan', label: 'Pesan', icon: MessageCircle, exact: false },
 ];
 
-// Rute halaman masuk & akun milik FE02 (Orang 2).
-const LOGIN_PATH = '/masuk';
+// Rute halaman akun milik FE02 (Orang 2).
 const ACCOUNT_PATH = '/akun';
 
 function isActive(pathname: string, href: string, exact: boolean) {
@@ -60,7 +59,7 @@ export function PemilikShell({ children }: { children: ReactNode }) {
           </div>
           <div className="flex items-center gap-3">
             <ButtonLink href="/" variant="secondary" size="sm" className="hidden sm:inline-flex">
-              Mode pencari
+              Lihat situs
             </ButtonLink>
             {session ? (
               <span
@@ -142,33 +141,49 @@ export function PemilikShell({ children }: { children: ReactNode }) {
 }
 
 function AuthRequired() {
-  const showDevLogin = false;
+  const pathname = usePathname() || '/pemilik';
+  const loginUrl = `/masuk?role=pemilik&next=${encodeURIComponent(pathname)}`;
+  const registerUrl = `/daftar?role=pemilik&next=${encodeURIComponent(pathname)}`;
+
   return (
     <Card className="mx-auto w-full max-w-md text-center">
       <LockKeyhole className="mx-auto h-8 w-8 text-brand" aria-hidden />
       <h1 className="mt-3 text-xl font-semibold">Masuk untuk mengelola kos</h1>
       <p className="mt-2 text-sm text-ink-muted">Ruang pemilik hanya dapat diakses oleh akun pemilik kos.</p>
-      <ButtonLink href={LOGIN_PATH} className="mt-5 w-full">
-        Masuk
-      </ButtonLink>
-      {showDevLogin ? (
-        <div className="mt-6 border-t border-line pt-6">
-          <p>Gunakan halaman masuk bersama.</p>
-        </div>
-      ) : null}
+      <div className="mt-5 flex flex-col gap-2">
+        <ButtonLink href={loginUrl} className="w-full">
+          Masuk ke Ruang Pemilik
+        </ButtonLink>
+        <ButtonLink href={registerUrl} variant="secondary" className="w-full">
+          Daftar Akun Pemilik
+        </ButtonLink>
+      </div>
     </Card>
   );
 }
 
 function RoleMismatch() {
+  const { session } = useSession();
+  const isAdmin = session?.user.role === 'admin';
+  const roleName = isAdmin ? 'Administrator' : 'Pencari Kos';
+  const targetHome = isAdmin ? '/admin' : '/';
+  const targetLabel = isAdmin ? 'Buka ruang admin' : 'Kembali ke beranda';
+
   return (
     <Card className="mx-auto w-full max-w-md text-center">
       <LockKeyhole className="mx-auto h-8 w-8 text-brand" aria-hidden />
       <h1 className="mt-3 text-xl font-semibold">Akses khusus pemilik kos</h1>
-      <p className="mt-2 text-sm text-ink-muted">Akun Anda tidak memiliki peran pemilik, sehingga tidak dapat membuka ruang ini.</p>
-      <ButtonLink href="/" variant="secondary" className="mt-5 w-full">
-        Kembali ke beranda
-      </ButtonLink>
+      <p className="mt-2 text-sm text-ink-muted">
+        Akun Anda saat ini tercatat sebagai <strong>{roleName}</strong>, sehingga tidak dapat mengakses ruang pemilik.
+      </p>
+      <div className="mt-5 flex flex-col gap-2">
+        <ButtonLink href={targetHome} variant="primary" className="w-full">
+          {targetLabel}
+        </ButtonLink>
+        <ButtonLink href="/" variant="secondary" className="w-full">
+          Lihat situs
+        </ButtonLink>
+      </div>
     </Card>
   );
 }

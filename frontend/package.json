@@ -9,7 +9,7 @@
     "lint": "eslint --config eslint.config.mjs .",
     "eslint": "eslint --config eslint.config.mjs .",
     "typecheck": "tsc --noEmit",
-    "test": "tsx --test test/normalizer.test.ts test/contract.test.ts test/backendClient.test.ts test/sessionGateway.test.ts test/sessionClient.test.ts test/submissionAdapter.test.ts test/submissionFlow.test.ts test/pagination.test.ts"
+    "test": "tsx --test test/normalizer.test.ts test/contract.test.ts test/backendClient.test.ts test/sessionGateway.test.ts test/sessionClient.test.ts test/submissionAdapter.test.ts test/submissionFlow.test.ts test/pagination.test.ts test/authRedirect.test.ts"
   },
   "dependencies": {
     "@fontsource-variable/inter": "5.3.0",

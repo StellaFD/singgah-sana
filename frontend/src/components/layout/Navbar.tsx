@@ -12,12 +12,11 @@ export default function Navbar() {
   const [logoutError, setLogoutError] = useState<string | null>(null);
   const [isLoggingOut, setIsLoggingOut] = useState(false);
 
-  const home =
-    auth.user?.role === 'pemilik'
-      ? '/pemilik'
-      : auth.user?.role === 'admin'
-      ? '/admin'
-      : '/akun';
+  const isOwner = auth.user?.role === 'pemilik';
+  const isAdmin = auth.user?.role === 'admin';
+  const isSeeker = auth.isAuthenticated && !isOwner && !isAdmin;
+
+  const home = isOwner ? '/pemilik' : isAdmin ? '/admin' : '/akun';
 
   const handleLogout = async () => {
     setLogoutError(null);
@@ -42,10 +41,35 @@ export default function Navbar() {
           <Link href="/" aria-label="Beranda Singgah Sana">
             <BrandLogo size={56} priority />
           </Link>
-          <nav className="hidden gap-8 md:flex" aria-label="Navigasi utama">
+          <nav className="hidden items-center gap-8 md:flex" aria-label="Navigasi utama">
             <Link href="/jelajah" className="hover:text-brand-primary">
               Jelajah kos
             </Link>
+            {isSeeker && (
+              <>
+                <Link href="/favorit" className="hover:text-brand-primary">
+                  Favorit
+                </Link>
+                <Link href="/pesan" className="hover:text-brand-primary">
+                  Pesan
+                </Link>
+              </>
+            )}
+            {isOwner && (
+              <>
+                <Link href="/pemilik/kos" className="hover:text-brand-primary">
+                  Kos saya
+                </Link>
+                <Link href="/pemilik/pesan" className="hover:text-brand-primary">
+                  Pesan
+                </Link>
+              </>
+            )}
+            {isAdmin && (
+              <Link href="/admin/review" className="hover:text-brand-primary">
+                Peninjauan
+              </Link>
+            )}
           </nav>
         </div>
 
@@ -55,26 +79,36 @@ export default function Navbar() {
           ) : auth.isAuthenticated ? (
             <>
               <Link href={home} className="font-medium text-brand-primary">
-                {auth.user?.nama}
+                {isOwner ? 'Ruang Pemilik' : isAdmin ? 'Ruang Admin' : auth.user?.nama}
               </Link>
-              <Link href="/akun/profil">Akun</Link>
+              {isOwner && (
+                <Link
+                  href="/pemilik/kos/baru"
+                  className="rounded-lg bg-brand-primary px-4 py-2 text-sm text-white hover:bg-brand-primary/90"
+                >
+                  Daftarkan kos
+                </Link>
+              )}
+              <Link href="/akun/profil" className="text-sm hover:text-brand-primary">
+                Akun
+              </Link>
               <button
                 type="button"
                 onClick={handleLogout}
                 disabled={isLoggingOut}
-                className="rounded-lg px-4 py-2 hover:bg-surface-muted disabled:opacity-50"
+                className="rounded-lg px-4 py-2 text-sm hover:bg-surface-muted disabled:opacity-50"
               >
                 {isLoggingOut ? 'Mengeluarkan...' : 'Keluar'}
               </button>
             </>
           ) : (
             <>
-              <Link href="/masuk" className="rounded-lg px-4 py-2">
+              <Link href="/masuk" className="rounded-lg px-4 py-2 hover:bg-surface-muted">
                 Masuk
               </Link>
               <Link
-                href="/daftar?role=pemilik"
-                className="rounded-lg bg-brand-primary px-5 py-3 text-white"
+                href="/daftar?role=pemilik&next=%2Fpemilik%2Fkos%2Fbaru"
+                className="rounded-lg bg-brand-primary px-5 py-3 text-white hover:bg-brand-primary/90"
               >
                 Daftarkan kos
               </Link>
@@ -113,7 +147,27 @@ export default function Navbar() {
           <Link href="/jelajah">Jelajah kos</Link>
           {auth.isAuthenticated ? (
             <>
-              <Link href={home}>Ruang saya</Link>
+              {isSeeker && (
+                <>
+                  <Link href="/favorit">Favorit</Link>
+                  <Link href="/pesan">Pesan</Link>
+                  <Link href="/akun">Ringkasan akun</Link>
+                </>
+              )}
+              {isOwner && (
+                <>
+                  <Link href="/pemilik">Ruang pemilik</Link>
+                  <Link href="/pemilik/kos">Kos saya</Link>
+                  <Link href="/pemilik/kos/baru">Daftarkan kos</Link>
+                  <Link href="/pemilik/pesan">Pesan</Link>
+                </>
+              )}
+              {isAdmin && (
+                <>
+                  <Link href="/admin">Ruang admin</Link>
+                  <Link href="/admin/review">Peninjauan</Link>
+                </>
+              )}
               <Link href="/akun/profil">Pengaturan akun</Link>
               <button
                 type="button"
@@ -127,7 +181,7 @@ export default function Navbar() {
           ) : (
             <>
               <Link href="/masuk">Masuk</Link>
-              <Link href="/daftar?role=pemilik">Daftarkan kos</Link>
+              <Link href="/daftar?role=pemilik&next=%2Fpemilik%2Fkos%2Fbaru">Daftarkan kos</Link>
             </>
           )}
         </nav>

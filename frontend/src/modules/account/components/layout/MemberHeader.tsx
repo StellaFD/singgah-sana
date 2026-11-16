@@ -11,13 +11,6 @@ import { Icon } from "../ui/Icon";
 import { Link } from "../ui/Link";
 import { Logo } from "./Brand";
 
-const mainNav = [
-  { to: externalPaths.explore, label: "Jelajah Kos", external: true },
-  { to: "/favorit", label: "Favorit" },
-  { to: "/pesan", label: "Pesan" },
-  { to: "/akun", label: "Ringkasan" },
-] as const;
-
 export function MemberHeader() {
   const requestLogout = useLogoutRequest();
   const { user } = useAuth();
@@ -39,14 +32,41 @@ export function MemberHeader() {
   }, [open]);
 
   if (!user) return null;
-  const isOwner = user.role === "pemilik" || user.role === "admin";
+
+  const navItems =
+    user.role === "admin"
+      ? [
+          { to: externalPaths.explore, label: "Jelajah Kos", external: true },
+          { to: "/admin/review", label: "Peninjauan", external: true },
+          { to: "/admin", label: "Ruang Admin", external: true },
+        ]
+      : user.role === "pemilik"
+      ? [
+          { to: externalPaths.explore, label: "Jelajah Kos", external: true },
+          { to: "/pemilik/kos", label: "Kos Saya", external: true },
+          { to: "/pemilik/pesan", label: "Pesan", external: true },
+          { to: "/pemilik", label: "Ruang Pemilik", external: true },
+        ]
+      : [
+          { to: externalPaths.explore, label: "Jelajah Kos", external: true },
+          { to: "/favorit", label: "Favorit", external: false },
+          { to: "/pesan", label: "Pesan", external: false },
+          { to: "/akun", label: "Ringkasan", external: false },
+        ];
+
+  const brandHome =
+    user.role === "admin" ? "/admin" : user.role === "pemilik" ? "/pemilik" : "/akun";
+  const roleLabel =
+    user.role === "admin" ? "Administrator" : user.role === "pemilik" ? "Pemilik Kos" : "Pencari Kos";
 
   return (
     <header className="member-header">
-      <Link to="/akun" aria-label="Singgah Sana, ringkasan akun"><Logo /></Link>
+      <Link to={brandHome} aria-label={`Singgah Sana, beranda ${roleLabel}`} external={user.role !== "pencari"}>
+        <Logo />
+      </Link>
       <nav aria-label="Navigasi utama" className="main-nav">
-        {mainNav.map((n) => (
-          <Link key={n.to} to={n.to} external={"external" in n} aria-current={path === n.to ? "page" : undefined}>
+        {navItems.map((n) => (
+          <Link key={n.to} to={n.to} external={n.external} aria-current={path === n.to ? "page" : undefined}>
             {n.label}
           </Link>
         ))}
@@ -67,15 +87,18 @@ export function MemberHeader() {
               <div className="menu-head">
                 <strong>{user.nama}</strong>
                 <span>{user.email}</span>
+                <span className="badge badge-brand" style={{ marginTop: 4 }}>{roleLabel}</span>
               </div>
               <div className="menu-mobile-only">
-                {mainNav.map((n) => (
-                  <Link key={n.to} role="menuitem" to={n.to} external={"external" in n}>{n.label}</Link>
+                {navItems.map((n) => (
+                  <Link key={n.to} role="menuitem" to={n.to} external={n.external}>{n.label}</Link>
                 ))}
               </div>
+              {user.role === "pemilik" && <Link role="menuitem" to="/pemilik" external>Ruang pemilik</Link>}
+              {user.role === "admin" && <Link role="menuitem" to="/admin" external>Ruang admin</Link>}
               <Link role="menuitem" to="/akun/profil">Profil</Link>
               <Link role="menuitem" to="/akun/keamanan">Keamanan</Link>
-              {isOwner && <Link role="menuitem" to={externalPaths.ownerSpace} external>Ruang pemilik</Link>}
+              <Link role="menuitem" to="/akun/notifikasi">Notifikasi</Link>
               <button type="button" role="menuitem" onClick={() => { setOpen(false); requestLogout(); }}>Keluar</button>
             </div>
           )}
