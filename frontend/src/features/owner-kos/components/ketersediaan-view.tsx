@@ -12,7 +12,7 @@ import { Spinner } from '@/components/owner-ui/spinner';
 import { useToast } from '@/components/owner-ui/toast';
 import { errorMessage } from '@/lib/owner/api/client';
 import { formatRupiah } from '@/lib/owner/format';
-import { ubahKetersediaan } from '../api';
+import { updateStock } from '../api';
 import { useKos } from '../hooks';
 import { ketersediaanSchema } from '../schema';
 import type { Kos } from '../types';
@@ -53,22 +53,29 @@ function KetersediaanForm({ kos }: { kos: Kos }) {
 
   const onSubmit = handleSubmit(async (values) => {
     try {
-      await ubahKetersediaan(kos._id, Number(values.jumlah_kamar_tersedia));
-      toast.success('Ketersediaan kamar diperbarui.');
+      await updateStock(
+        kos._id,
+        kos.version_ketersediaan,
+        Number(values.jumlah_kamar_tersedia)
+      );
+      toast.success('Ketersediaan kamar berhasil diperbarui.');
       router.push(`/pemilik/kos/${kos._id}`);
     } catch (err) {
-      setError('jumlah_kamar_tersedia', { type: 'server', message: errorMessage(err) });
+      setError('jumlah_kamar_tersedia', {
+        type: 'server',
+        message: errorMessage(err),
+      });
     }
   });
 
   return (
     <Card>
-      <CardTitle>Kamar · {formatRupiah(kos.harga_per_bulan)} / bulan</CardTitle>
+      <CardTitle>Kamar · {kos.harga_per_bulan !== null ? `${formatRupiah(kos.harga_per_bulan)} / bulan` : 'Harga belum diisi'}</CardTitle>
       <CardDescription>Perubahan ketersediaan berlaku langsung pada pencarian, tanpa peninjauan ulang.</CardDescription>
       <form onSubmit={onSubmit} noValidate className="mt-6 flex flex-col gap-5">
         <div className="grid gap-5 sm:grid-cols-2">
           <Field id="total" label="Total kamar" hint="Ubah total kamar melalui Edit informasi.">
-            <Input id="total" value={kos.jumlah_kamar_total} readOnly disabled aria-describedby="total-hint" />
+            <Input id="total" value={kos.jumlah_kamar_total ?? ''} readOnly disabled aria-describedby="total-hint" />
           </Field>
           <Field id="jumlah_kamar_tersedia" label="Kamar tersedia" required error={errors.jumlah_kamar_tersedia?.message}>
             <Input

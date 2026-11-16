@@ -7,7 +7,12 @@ import { KosStatusBadge } from './kos-status-badge';
 
 export function KosListItem({ kos }: { kos: Kos }) {
   const status = getKosStatus(kos);
-  const detail = status.key === 'terbit' ? `${kos.jumlah_kamar_tersedia} dari ${kos.jumlah_kamar_total} kamar tersedia` : status.hint;
+  const detail =
+    status.key === 'terbit'
+      ? kos.jumlah_kamar_total !== null
+        ? `${kos.jumlah_kamar_tersedia} dari ${kos.jumlah_kamar_total} kamar tersedia`
+        : `${kos.jumlah_kamar_tersedia} kamar tersedia`
+      : status.hint;
 
   return (
     <li className="flex flex-col gap-4 rounded-2xl border border-line bg-white p-3 transition-colors hover:border-brand-ring sm:flex-row sm:items-center">
@@ -15,7 +20,7 @@ export function KosListItem({ kos }: { kos: Kos }) {
       <div className="min-w-0 flex-1 px-1 sm:px-0">
         <p className="truncate font-semibold">{kos.nama}</p>
         <p className="mt-1 text-sm text-ink-muted">
-          {kos.area_kampus} · {capitalize(kos.tipe)}
+          {kos.area_kampus ? `${kos.area_kampus} · ` : ''}{kos.tipe ? capitalize(kos.tipe) : 'Tipe belum ditentukan'}
         </p>
         <p className="mt-1 line-clamp-1 text-xs text-ink-muted">{detail}</p>
       </div>
