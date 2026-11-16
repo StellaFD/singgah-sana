@@ -15,10 +15,10 @@ export async function getInquiryDetail(id: string, signal?: AbortSignal): Promis
 }
 
 /** POST /api/inquiries/:id/messages  (target: POST /inquiry/:id/messages) */
-export async function kirimPesanPemilik(id: string, pesan: string): Promise<ApiResult<ChatMessage>> {
+export async function kirimPesanPemilik(id: string, pesan: string, clientMsgId?: string): Promise<ApiResult<ChatMessage>> {
   return apiRequest<ApiResult<ChatMessage>>(`/inquiries/${encodeURIComponent(id)}/messages`, {
     method: 'POST',
-    body: { pesan },
+    body: { pesan, client_msg_id: clientMsgId },
   });
 }
 

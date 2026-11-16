@@ -15,40 +15,60 @@ export function InquiryThread({ inquiry, onReplied }: InquiryThreadProps) {
   const pencari = inquiry.pencari_id;
   const [detail, setDetail] = useState<OwnerInquiryDetail | null>(null);
 
-  // Muat riwayat obrolan lengkap dan polling saat tab aktif (setiap 3.5 detik)
+  // Muat riwayat obrolan lengkap dan polling saat tab aktif dengan dynamic chained timeout & AbortController
   useEffect(() => {
     let timer: NodeJS.Timeout | null = null;
     let active = true;
-    let inFlight = false;
-    let backoffMultiplier = 1;
+    let abortCtrl: AbortController | null = null;
+    let delayMs = 3500;
 
-    const fetchDetail = async () => {
-      if (document.visibilityState !== 'visible' || inFlight || !active) return;
-      inFlight = true;
+    const scheduleNext = () => {
+      if (!active) return;
+      if (timer) clearTimeout(timer);
+      timer = setTimeout(executePoll, delayMs);
+    };
+
+    const executePoll = async () => {
+      if (!active || document.visibilityState !== 'visible') {
+        scheduleNext();
+        return;
+      }
+
+      if (abortCtrl) abortCtrl.abort();
+      abortCtrl = new AbortController();
+
       try {
-        const res = await getInquiryDetail(inquiry._id);
+        const res = await getInquiryDetail(inquiry._id, abortCtrl.signal);
         if (active) {
           setDetail(res);
-          backoffMultiplier = 1;
+          delayMs = 3500; // Reset ke normal saat berhasil
         }
       } catch {
-        backoffMultiplier = Math.min(backoffMultiplier * 1.5, 4);
+        if (abortCtrl?.signal.aborted) return;
+        // Exponential backoff saat gagal (3.5s -> 5.25s -> max 15s)
+        delayMs = Math.min(Math.round(delayMs * 1.5), 15000);
       } finally {
-        inFlight = false;
+        if (active) scheduleNext();
       }
     };
 
-    void fetchDetail();
-    timer = setInterval(fetchDetail, 3500 * backoffMultiplier);
+    // Eksekusi awal
+    void executePoll();
 
     const handleVisibility = () => {
-      if (document.visibilityState === 'visible') void fetchDetail();
+      if (document.visibilityState === 'visible' && active) {
+        delayMs = 3500;
+        void executePoll();
+      } else if (abortCtrl) {
+        abortCtrl.abort();
+      }
     };
     document.addEventListener('visibilitychange', handleVisibility);
 
     return () => {
       active = false;
-      if (timer) clearInterval(timer);
+      if (timer) clearTimeout(timer);
+      if (abortCtrl) abortCtrl.abort();
       document.removeEventListener('visibilitychange', handleVisibility);
     };
   }, [inquiry._id, inquiry.updatedAt]);

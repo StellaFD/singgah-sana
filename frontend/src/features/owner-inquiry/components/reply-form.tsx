@@ -35,13 +35,14 @@ export function ReplyForm({ inquiry, onReplied }: ReplyFormProps) {
   const onSubmit = handleSubmit(async (values) => {
     try {
       const teks = values.balasan.trim();
+      const clientMsgId = `owner-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`;
       if (inquiry.status === 'menunggu' && !inquiry.balasan) {
         // Balasan pertama menggunakan endpoint reply kanonikal
         const result = await balasInquiry(inquiry._id, teks);
         onReplied({ ...inquiry, balasan: result.data.balasan, status: result.data.status, updatedAt: result.data.updatedAt });
       } else {
-        // Pesan lanjutan menggunakan endpoint messages multi-turn
-        const result = await kirimPesanPemilik(inquiry._id, teks);
+        // Pesan lanjutan menggunakan endpoint messages multi-turn dengan client_msg_id
+        const result = await kirimPesanPemilik(inquiry._id, teks, clientMsgId);
         const existingList = inquiry.pesan_list || [];
         onReplied({
           ...inquiry,

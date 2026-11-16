@@ -25,32 +25,58 @@ export function PesanView() {
   const [query, setQuery] = useState('');
   const [filter, setFilter] = useState<Filter>('semua');
 
-  // Background polling daftar percakapan hanya saat tab aktif, tanpa memicu loading skeleton penuh
+  // Background polling daftar percakapan hanya saat tab aktif dengan dynamic chained timeout & AbortController
   useEffect(() => {
     let timer: NodeJS.Timeout | null = null;
-    let inFlight = false;
+    let active = true;
+    let abortCtrl: AbortController | null = null;
+    let delayMs = 4000;
+
+    const scheduleNext = () => {
+      if (!active) return;
+      if (timer) clearTimeout(timer);
+      timer = setTimeout(pollList, delayMs);
+    };
 
     const pollList = async () => {
-      if (document.visibilityState !== 'visible' || inFlight) return;
-      inFlight = true;
+      if (!active || document.visibilityState !== 'visible') {
+        scheduleNext();
+        return;
+      }
+
+      if (abortCtrl) abortCtrl.abort();
+      abortCtrl = new AbortController();
+
       try {
-        const freshList = await listInquiryPemilik();
-        setData(() => freshList);
+        const freshList = await listInquiryPemilik(abortCtrl.signal);
+        if (active) {
+          setData(() => freshList);
+          delayMs = 4000;
+        }
       } catch {
-        // Kegagalan jaringan sesaat di background diabaikan agar UI tidak reset
+        if (abortCtrl?.signal.aborted) return;
+        delayMs = Math.min(Math.round(delayMs * 1.5), 15000);
       } finally {
-        inFlight = false;
+        if (active) scheduleNext();
       }
     };
 
-    timer = setInterval(pollList, 4000);
+    scheduleNext();
+
     const handleVisibility = () => {
-      if (document.visibilityState === 'visible') void pollList();
+      if (document.visibilityState === 'visible' && active) {
+        delayMs = 4000;
+        void pollList();
+      } else if (abortCtrl) {
+        abortCtrl.abort();
+      }
     };
     document.addEventListener('visibilitychange', handleVisibility);
 
     return () => {
-      if (timer) clearInterval(timer);
+      active = false;
+      if (timer) clearTimeout(timer);
+      if (abortCtrl) abortCtrl.abort();
       document.removeEventListener('visibilitychange', handleVisibility);
     };
   }, [setData]);

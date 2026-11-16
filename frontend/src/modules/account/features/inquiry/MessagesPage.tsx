@@ -28,6 +28,63 @@ export default function MessagesPage() {
 
   const convs = useAsync((signal) => inquiryApi.list(signal), []);
   const list: Percakapan[] = useMemo(() => convs.data ?? [], [convs.data]); // data lama dipertahankan saat memuat ulang (tanpa mengosongkan layar)
+
+  // Polling senyap daftar percakapan pencari hanya saat tab aktif dengan dynamic chained timeout & AbortController
+  useEffect(() => {
+    let timer: NodeJS.Timeout | null = null;
+    let active = true;
+    let abortCtrl: AbortController | null = null;
+    let delayMs = 5000;
+
+    const scheduleNext = () => {
+      if (!active) return;
+      if (timer) clearTimeout(timer);
+      timer = setTimeout(pollConvs, delayMs);
+    };
+
+    const pollConvs = async () => {
+      if (!active || document.visibilityState !== "visible") {
+        scheduleNext();
+        return;
+      }
+
+      if (abortCtrl) abortCtrl.abort();
+      abortCtrl = new AbortController();
+
+      try {
+        const fresh = await inquiryApi.list(abortCtrl.signal);
+        if (active) {
+          convs.setData(() => fresh);
+          delayMs = 5000;
+        }
+      } catch {
+        if (abortCtrl?.signal.aborted) return;
+        delayMs = Math.min(Math.round(delayMs * 1.5), 20000);
+      } finally {
+        if (active) scheduleNext();
+      }
+    };
+
+    scheduleNext();
+
+    const handleVisibility = () => {
+      if (document.visibilityState === "visible" && active) {
+        delayMs = 5000;
+        void pollConvs();
+      } else if (abortCtrl) {
+        abortCtrl.abort();
+      }
+    };
+    document.addEventListener("visibilitychange", handleVisibility);
+
+    return () => {
+      active = false;
+      if (timer) clearTimeout(timer);
+      if (abortCtrl) abortCtrl.abort();
+      document.removeEventListener("visibilitychange", handleVisibility);
+    };
+  }, [convs]);
+
   const filtered = useMemo(() => {
     const q = search.trim().toLowerCase();
     return q ? list.filter((c) => c.kos.nama.toLowerCase().includes(q) || c.pemilik.nama.toLowerCase().includes(q)) : list;
@@ -90,38 +147,59 @@ function Thread({ conv, onActivity }: { conv: Percakapan; onActivity: () => void
   const [draftError, setDraftError] = useState<string>();
   const endRef = useRef<HTMLDivElement>(null);
   const full = conv.kos.kamarTersedia === 0;
-  const isPollingRef = useRef(false);
 
-  // Polling pembaruan berkala hanya saat tab/halaman aktif (setiap 3.5 detik)
-  // Tidak me-reload seluruh ringkasan/favorit; hanya mengecek pesan terbaru thread ini secara senyap
+  // Polling pembaruan berkala thread hanya saat tab aktif dengan dynamic chained timeout & AbortController
   useEffect(() => {
     let timer: NodeJS.Timeout | null = null;
-    let cancelled = false;
+    let active = true;
+    let abortCtrl: AbortController | null = null;
+    let delayMs = 3500;
 
-    const poll = async () => {
-      if (document.visibilityState !== "visible" || isPollingRef.current || cancelled) return;
-      isPollingRef.current = true;
+    const scheduleNext = () => {
+      if (!active) return;
+      if (timer) clearTimeout(timer);
+      timer = setTimeout(pollThread, delayMs);
+    };
+
+    const pollThread = async () => {
+      if (!active || document.visibilityState !== "visible") {
+        scheduleNext();
+        return;
+      }
+
+      if (abortCtrl) abortCtrl.abort();
+      abortCtrl = new AbortController();
+
       try {
-        const latestMsgs = await inquiryApi.messages(conv.id);
-        if (!cancelled) {
+        const latestMsgs = await inquiryApi.messages(conv.id, abortCtrl.signal);
+        if (active) {
           msgs.setData(() => latestMsgs);
+          delayMs = 3500;
         }
       } catch {
-        // Abaikan kegagalan jaringan sesaat pada background polling tanpa mereset UI
+        if (abortCtrl?.signal.aborted) return;
+        delayMs = Math.min(Math.round(delayMs * 1.5), 15000);
       } finally {
-        isPollingRef.current = false;
+        if (active) scheduleNext();
       }
     };
 
-    timer = setInterval(poll, 3500);
+    scheduleNext();
+
     const handleVisibility = () => {
-      if (document.visibilityState === "visible") void poll();
+      if (document.visibilityState === "visible" && active) {
+        delayMs = 3500;
+        void pollThread();
+      } else if (abortCtrl) {
+        abortCtrl.abort();
+      }
     };
     document.addEventListener("visibilitychange", handleVisibility);
 
     return () => {
-      cancelled = true;
-      if (timer) clearInterval(timer);
+      active = false;
+      if (timer) clearTimeout(timer);
+      if (abortCtrl) abortCtrl.abort();
       document.removeEventListener("visibilitychange", handleVisibility);
     };
   }, [conv.id, msgs]);
@@ -133,7 +211,7 @@ function Thread({ conv, onActivity }: { conv: Percakapan; onActivity: () => void
     const optimistic: LocalMsg = { id, dari: "saya", isi: text, waktu: new Date().toISOString(), status: "terkirim", state: "sending" };
     setLocal((l) => (retryId ? l.map((m) => (m.id === id ? optimistic : m)) : [...l, optimistic]));
     try {
-      const saved = await inquiryApi.send(conv.id, text);
+      const saved = await inquiryApi.send(conv.id, text, id);
       // Rekonsiliasi: hapus optimistic message dari `local` dan perbarui `msgs.data` langsung
       setLocal((l) => l.filter((m) => m.id !== id));
       msgs.setData((prev) => {

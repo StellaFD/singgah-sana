@@ -89,10 +89,10 @@ export const inquiryApi = {
     }
   },
 
-  send: async (id: string, isi: string): Promise<Pesan> => {
+  send: async (id: string, isi: string, clientMsgId?: string): Promise<Pesan> => {
     const res = await api.post<{ _id: string; pengirim_id: string; pengirim_role: string; teks: string; createdAt: string }>(
       `/inquiry/${encodeURIComponent(id)}/messages`,
-      { pesan: isi }
+      { pesan: isi, client_msg_id: clientMsgId }
     );
     return {
       id: res.data._id,
@@ -103,8 +103,8 @@ export const inquiryApi = {
     };
   },
 
-  start: async (kosId: string, isi: string) => {
-    const result = await api.post<InquiryDto>('/inquiry', { kos_id: kosId, pesan: isi });
+  start: async (kosId: string, isi: string, clientMsgId?: string) => {
+    const result = await api.post<InquiryDto>('/inquiry', { kos_id: kosId, pesan: isi, client_msg_id: clientMsgId });
     return { percakapanId: result.data._id };
   },
 };
