@@ -84,7 +84,9 @@ export default function LoginPage() {
       {form.formError && <Alert tone="error">{form.formError}</Alert>}
       <Field label="Alamat email" type="email" autoComplete="email" placeholder="nama@email.com" {...form.field("email")} />
       <Field label="Kata sandi" type="password" autoComplete="current-password" placeholder="Kata sandi" {...form.field("password")} />
-      <p className="muted small">Pemulihan melalui email belum diaktifkan.</p>
+      <div style={{ textAlign: "right", marginTop: "-8px", marginBottom: "12px" }}>
+        <Link to="/lupa-sandi" className="link small">Lupa kata sandi?</Link>
+      </div>
       <Button type="submit" block loading={form.submitting}>Masuk</Button>
       {roleContext === "admin" ? (
         <p className="auth-alt muted small">Pendaftaran akun administrator tidak tersedia secara publik.</p>

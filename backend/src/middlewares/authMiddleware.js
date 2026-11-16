@@ -2,7 +2,16 @@ const jwt = require('jsonwebtoken');
 const User = require('../models/User');
 const { getJwtSecret } = require('../config/jwt');
 async function sessionUser(req) {
-  if (req.sessionRecord?.user_id) return User.findById(req.sessionRecord.user_id);
+  if (req.sessionRecord?.user_id) {
+    const user = await User.findById(req.sessionRecord.user_id).select('+token_version');
+    if (!user) return null;
+    const sessionVer = req.sessionRecord.token_version ?? 0;
+    const userVer = user.token_version ?? 0;
+    if (sessionVer !== userVer) {
+      return null;
+    }
+    return user;
+  }
   return null;
 }
 

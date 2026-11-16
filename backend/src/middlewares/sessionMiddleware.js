@@ -41,13 +41,18 @@ function validateCsrf(req, res, next) {
   next();
 }
 
-async function createSession(req, res, userId = null) {
+async function createSession(req, res, userId = null, tokenVersion = 0) {
   const token = randomToken();
   const csrfToken = csrfFor(token);
   const configured = Number(process.env.SESSION_TTL_SECONDS || 86400);
   const ttl = Number.isFinite(configured) && configured > 0 ? Math.min(configured, 604800) : 86400;
-  const session = await Session.create({ token_hash: digest(token), csrf_hash: digest(csrfToken),
-    user_id: userId, expires_at: new Date(Date.now() + ttl * 1000) });
+  const session = await Session.create({
+    token_hash: digest(token),
+    csrf_hash: digest(csrfToken),
+    user_id: userId,
+    token_version: tokenVersion,
+    expires_at: new Date(Date.now() + ttl * 1000),
+  });
   if (req.sessionRecord) await Session.deleteOne({ _id: req.sessionRecord._id });
   req.sessionRecord = session;
   res.cookie(COOKIE_NAME, token, { ...cookieOptions(), maxAge: ttl * 1000 });

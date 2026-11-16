@@ -11,6 +11,7 @@ export interface AuthUser {
   nomor_telepon?: string;
   foto_profil?: string;
   email_verified?: boolean;
+  email_verified_at?: string | null;
   password_updated_at?: string;
   role: 'pencari' | 'pemilik' | 'admin' | string;
   status?: string;

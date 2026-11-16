@@ -44,6 +44,11 @@ const userSchema = new mongoose.Schema(
       default: '',
     },
     status: { type: String, enum: ['active', 'suspended'], default: 'active' },
+    email_verified_at: { type: Date, default: null },
+    reset_password_token_hash: { type: String, default: null, select: false, index: true },
+    reset_password_expires_at: { type: Date, default: null, select: false },
+    verify_email_token_hash: { type: String, default: null, select: false, index: true },
+    verify_email_expires_at: { type: Date, default: null, select: false },
     token_version: { type: Number, default: 0, select: false },
     password_updated_at: { type: Date, default: null },
     notification_preferences: {

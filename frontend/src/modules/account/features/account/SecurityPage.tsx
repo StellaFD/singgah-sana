@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { AccountLayout } from "../../components/layout/AccountLayout";
-import { Button } from "../../components/ui/Button";
+import { Button, ButtonLink } from "../../components/ui/Button";
 import { Card, PageHeading } from "../../components/ui/Display";
 import { Dialog } from "../../components/ui/Dialog";
 import { Alert } from "../../components/ui/Feedback";
@@ -33,7 +33,12 @@ export default function SecurityPage() {
         <h2 className="h3">Alamat email</h2>
         <h3 className="h4">{user.email} · {user.emailTerverifikasi ? "Terverifikasi" : "Belum terverifikasi"}</h3>
         <p className="muted">Perubahan email perlu diverifikasi melalui alamat baru.</p>
-        <Button variant="secondary" disabled title="Perubahan email memerlukan layanan verifikasi email">Ubah email</Button>
+        <div style={{ display: "flex", gap: "8px", flexWrap: "wrap", alignItems: "center" }}>
+          {!user.emailTerverifikasi && (
+            <ButtonLink to="/verifikasi-email">Verifikasi email sekarang</ButtonLink>
+          )}
+          <Button variant="secondary" disabled title="Perubahan email memerlukan layanan verifikasi email">Ubah email</Button>
+        </div>
       </Card>
       <Card className="action-card">
         <h2 className="h3">Hapus akun</h2>

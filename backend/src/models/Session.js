@@ -4,6 +4,7 @@ const sessionSchema = new mongoose.Schema({
   token_hash: { type: String, required: true, unique: true },
   csrf_hash: { type: String, required: true },
   user_id: { type: mongoose.Schema.Types.ObjectId, ref: 'User', default: null, index: true },
+  token_version: { type: Number, default: 0 },
   expires_at: { type: Date, required: true, index: { expires: 0 } },
 }, { timestamps: true });
 

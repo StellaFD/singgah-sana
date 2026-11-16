@@ -88,7 +88,14 @@ export default function ProfilePage() {
           </div>
           <div className="email-status">
             <span>{user.email}</span>
-            {user.emailTerverifikasi ? <Badge tone="success">Email terverifikasi</Badge> : <Badge tone="danger">Email belum terverifikasi</Badge>}
+            {user.emailTerverifikasi ? (
+              <Badge tone="success">Email terverifikasi</Badge>
+            ) : (
+              <>
+                <Badge tone="danger">Email belum terverifikasi</Badge>
+                <Link to="/verifikasi-email" className="link small">Verifikasi sekarang</Link>
+              </>
+            )}
           </div>
           <p className="muted small">Alamat email dan kata sandi dikelola melalui menu Keamanan. Nomor kontakmu tidak ditampilkan pada profil publik pencari.</p>
           <Link to="/akun/keamanan" className="link">Kelola keamanan akun</Link>
