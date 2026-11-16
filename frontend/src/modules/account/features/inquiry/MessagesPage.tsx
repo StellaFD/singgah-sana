@@ -90,40 +90,57 @@ function Thread({ conv, onActivity }: { conv: Percakapan; onActivity: () => void
   const [draftError, setDraftError] = useState<string>();
   const endRef = useRef<HTMLDivElement>(null);
   const full = conv.kos.kamarTersedia === 0;
+  const isPollingRef = useRef(false);
 
   // Polling pembaruan berkala hanya saat tab/halaman aktif (setiap 3.5 detik)
+  // Tidak me-reload seluruh ringkasan/favorit; hanya mengecek pesan terbaru thread ini secara senyap
   useEffect(() => {
     let timer: NodeJS.Timeout | null = null;
-    const poll = () => {
-      if (document.visibilityState === "visible") {
-        void msgs.reload();
-        onActivity();
+    let cancelled = false;
+
+    const poll = async () => {
+      if (document.visibilityState !== "visible" || isPollingRef.current || cancelled) return;
+      isPollingRef.current = true;
+      try {
+        const latestMsgs = await inquiryApi.messages(conv.id);
+        if (!cancelled) {
+          msgs.setData(() => latestMsgs);
+        }
+      } catch {
+        // Abaikan kegagalan jaringan sesaat pada background polling tanpa mereset UI
+      } finally {
+        isPollingRef.current = false;
       }
     };
-    const handleVisibility = () => {
-      if (document.visibilityState === "visible") {
-        poll();
-      }
-    };
+
     timer = setInterval(poll, 3500);
+    const handleVisibility = () => {
+      if (document.visibilityState === "visible") void poll();
+    };
     document.addEventListener("visibilitychange", handleVisibility);
+
     return () => {
+      cancelled = true;
       if (timer) clearInterval(timer);
       document.removeEventListener("visibilitychange", handleVisibility);
     };
-  }, [conv.id, msgs, onActivity]);
+  }, [conv.id, msgs]);
 
   useEffect(() => { endRef.current?.scrollIntoView({ block: "nearest" }); }, [local.length, msgs.status]);
 
   const send = async (text: string, retryId?: string) => {
-    const id = retryId ?? `tmp-${Date.now()}`;
+    const id = retryId ?? `client-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`;
     const optimistic: LocalMsg = { id, dari: "saya", isi: text, waktu: new Date().toISOString(), status: "terkirim", state: "sending" };
     setLocal((l) => (retryId ? l.map((m) => (m.id === id ? optimistic : m)) : [...l, optimistic]));
     try {
       const saved = await inquiryApi.send(conv.id, text);
-      setLocal((l) => l.map((m) => (m.id === id ? { ...saved } : m)));
+      // Rekonsiliasi: hapus optimistic message dari `local` dan perbarui `msgs.data` langsung
+      setLocal((l) => l.filter((m) => m.id !== id));
+      msgs.setData((prev) => {
+        const exists = prev.some((m) => m.id === saved.id || (m.isi === saved.isi && Math.abs(new Date(m.waktu).getTime() - new Date(saved.waktu).getTime()) < 3000));
+        return exists ? prev : [...prev, saved];
+      });
       onActivity();
-      void msgs.reload();
     } catch {
       setLocal((l) => l.map((m) => (m.id === id ? { ...m, state: "failed" } : m)));
     }
@@ -139,7 +156,10 @@ function Thread({ conv, onActivity }: { conv: Percakapan; onActivity: () => void
     void send(text);
   };
 
-  const all: LocalMsg[] = [...(msgs.status === "success" ? msgs.data : []), ...local];
+  // Dedup pesan server dan local (mencegah pesan ganda)
+  const serverMsgs = msgs.status === "success" || msgs.status === "loading" ? (msgs.data ?? []) : [];
+  const dedupedLocal = local.filter((loc) => !serverMsgs.some((s) => s.id === loc.id || (s.isi === loc.isi && s.dari === 'saya' && Math.abs(new Date(s.waktu).getTime() - new Date(loc.waktu).getTime()) < 4000)));
+  const all: LocalMsg[] = [...serverMsgs, ...dedupedLocal];
 
   return (
     <Card className="chat" aria-label={`Percakapan dengan ${conv.pemilik.nama}`}>

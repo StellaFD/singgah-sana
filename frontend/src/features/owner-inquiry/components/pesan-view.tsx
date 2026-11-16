@@ -1,6 +1,6 @@
 'use client';
 
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { usePathname, useRouter, useSearchParams } from 'next/navigation';
 import { MessageCircle, Search } from 'lucide-react';
 import { PageHeader } from '@/components/owner-layout/page-header';
@@ -11,6 +11,7 @@ import { Skeleton } from '@/components/owner-ui/spinner';
 import { cn } from '@/lib/owner/cn';
 import { formatRelativeShort } from '@/lib/owner/format';
 import { useInquiryPemilik } from '../hooks';
+import { listInquiryPemilik } from '../api';
 import type { OwnerInquiry } from '../types';
 import { InquiryThread } from './inquiry-thread';
 
@@ -23,6 +24,36 @@ export function PesanView() {
   const pathname = usePathname();
   const [query, setQuery] = useState('');
   const [filter, setFilter] = useState<Filter>('semua');
+
+  // Background polling daftar percakapan hanya saat tab aktif, tanpa memicu loading skeleton penuh
+  useEffect(() => {
+    let timer: NodeJS.Timeout | null = null;
+    let inFlight = false;
+
+    const pollList = async () => {
+      if (document.visibilityState !== 'visible' || inFlight) return;
+      inFlight = true;
+      try {
+        const freshList = await listInquiryPemilik();
+        setData(() => freshList);
+      } catch {
+        // Kegagalan jaringan sesaat di background diabaikan agar UI tidak reset
+      } finally {
+        inFlight = false;
+      }
+    };
+
+    timer = setInterval(pollList, 4000);
+    const handleVisibility = () => {
+      if (document.visibilityState === 'visible') void pollList();
+    };
+    document.addEventListener('visibilitychange', handleVisibility);
+
+    return () => {
+      if (timer) clearInterval(timer);
+      document.removeEventListener('visibilitychange', handleVisibility);
+    };
+  }, [setData]);
 
   const list = useMemo(() => {
     const term = query.trim().toLowerCase();

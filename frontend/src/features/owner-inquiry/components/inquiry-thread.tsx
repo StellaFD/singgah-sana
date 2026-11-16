@@ -19,19 +19,27 @@ export function InquiryThread({ inquiry, onReplied }: InquiryThreadProps) {
   useEffect(() => {
     let timer: NodeJS.Timeout | null = null;
     let active = true;
+    let inFlight = false;
+    let backoffMultiplier = 1;
 
     const fetchDetail = async () => {
-      if (document.visibilityState !== 'visible') return;
+      if (document.visibilityState !== 'visible' || inFlight || !active) return;
+      inFlight = true;
       try {
         const res = await getInquiryDetail(inquiry._id);
-        if (active) setDetail(res);
+        if (active) {
+          setDetail(res);
+          backoffMultiplier = 1;
+        }
       } catch {
-        // Fallback aman
+        backoffMultiplier = Math.min(backoffMultiplier * 1.5, 4);
+      } finally {
+        inFlight = false;
       }
     };
 
     void fetchDetail();
-    timer = setInterval(fetchDetail, 3500);
+    timer = setInterval(fetchDetail, 3500 * backoffMultiplier);
 
     const handleVisibility = () => {
       if (document.visibilityState === 'visible') void fetchDetail();
