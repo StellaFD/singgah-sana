@@ -6,6 +6,8 @@ const MediaAsset = require('../models/MediaAsset');
 const Kos = require('../models/Kos');
 const Pengajuan = require('../models/Pengajuan');
 const { ensureAbsoluteUrl } = require('../dto/submissionDto');
+const { getMediaProvider } = require('../config/mediaStorage');
+const cloudinaryStorage = require('./cloudinaryStorage');
 
 const UPLOAD_DIR = path.join(__dirname, '../../uploads');
 const MAX_FILE_SIZE = 5 * 1024 * 1024; // 5 MiB
@@ -97,6 +99,27 @@ async function uploadMediaAsset({ file, alt, userId }) {
     err.statusCode = 422;
     err.code = 'VALIDATION_ERROR';
     throw err;
+  }
+
+  if (getMediaProvider() === 'cloudinary') {
+    const stored = await cloudinaryStorage.uploadImageBuffer(buffer, userId);
+    try {
+      const asset = await MediaAsset.create({
+        ...stored,
+        user_id: userId,
+        alt: typeof alt === 'string' ? alt.slice(0, 160) : '',
+        original_filename: file.originalname || '',
+        mime_type: file.mimetype,
+        file_size: buffer.length,
+      });
+      return { asset_id: String(asset._id), url: asset.url, alt: asset.alt };
+    } catch (error) {
+      await cloudinaryStorage.deleteImage({
+        publicId: stored.cloudinary_public_id,
+        cloudName: stored.cloudinary_cloud_name,
+      }).catch(() => console.error('[Media] Pembersihan unggahan tertunda setelah penyimpanan metadata gagal.'));
+      throw error;
+    }
   }
 
   await fs.promises.mkdir(UPLOAD_DIR, { recursive: true });
@@ -205,6 +228,8 @@ async function deleteMediaAsset(userId, assetId) {
     Kos.findOne({
       $or: [
         { foto_id_list: asset._id },
+        { 'draft_konten.foto_ids': String(asset._id) },
+        { 'draft_konten.foto.asset_id': String(asset._id) },
         { foto: { $regex: filename } },
       ],
     }),
@@ -223,6 +248,13 @@ async function deleteMediaAsset(userId, assetId) {
     const err = new Error('Aset media masih digunakan pada listing atau riwayat pengajuan');
     err.statusCode = 409;
     throw err;
+  }
+
+  if (asset.storage_kind === 'cloudinary') {
+    await cloudinaryStorage.deleteImage({
+      publicId: asset.cloudinary_public_id,
+      cloudName: asset.cloudinary_cloud_name,
+    });
   }
 
   asset.is_deleted = true;
