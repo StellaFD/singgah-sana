@@ -56,6 +56,10 @@ const inquirySchema = new mongoose.Schema(
       trim: true,
       maxlength: [1000, 'Balasan maksimal 1000 karakter'],
     },
+    balasan_at: {
+      type: Date,
+      default: null,
+    },
     status: {
       type: String,
       enum: ['menunggu', 'dibalas'],
@@ -87,14 +91,14 @@ inquirySchema.virtual('riwayat_pesan').get(function () {
       createdAt: this.createdAt || new Date(),
     });
   }
-  // 2. Balasan awal dari pemilik (jika ada pada format legacy)
+  // 2. Balasan awal dari pemilik (jika ada pada format legacy, gunakan balasan_at yang stabil)
   if (this.balasan) {
     hasil.push({
       _id: `${this._id}-1`,
       pengirim_id: this.pemilik_id?._id || this.pemilik_id,
       pengirim_role: 'pemilik',
       teks: this.balasan,
-      createdAt: this.updatedAt || this.createdAt || new Date(),
+      createdAt: this.balasan_at || this.updatedAt || this.createdAt || new Date(),
     });
   }
   // 3. Pesan-pesan berikutnya dari array pesan_list

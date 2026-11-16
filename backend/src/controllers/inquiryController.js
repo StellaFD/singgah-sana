@@ -6,9 +6,68 @@ const { kirimNotifikasi } = require('../utils/notifikasi');
 const PESAN_INQUIRY_DUPLIKAT =
   'Anda masih memiliki pertanyaan yang menunggu balasan untuk kos ini. Mohon tunggu balasan pemilik sebelum mengirim pertanyaan baru';
 
+/**
+ * Helper kebijakan bersama untuk memeriksa apakah percakapan aktif dan mengizinkan pesan baru.
+ * Listing harus: approved, active, normal, belum dihapus (deleted_at null).
+ * Pemilik harus: aktif (status !== 'suspended').
+ * Jika listing archived atau suspended/banned, percakapan menjadi read-only.
+ */
+function evaluateMessagingPolicy(kosDoc, senderUser) {
+  if (!senderUser || senderUser.status === 'suspended') {
+    return {
+      allowed: false,
+      status: 403,
+      message: 'Akun Anda sedang dibatasi (suspended), tidak dapat mengirim pesan',
+    };
+  }
+
+  if (!kosDoc || kosDoc.deleted_at) {
+    return {
+      allowed: false,
+      status: 400,
+      message: 'Listing kos ini sudah dihapus, pesan baru tidak dapat dikirim',
+    };
+  }
+
+  if (kosDoc.status_verifikasi !== 'approved') {
+    return {
+      allowed: false,
+      status: 400,
+      message: 'Kos belum disetujui untuk publik sehingga belum dapat menerima pesan',
+    };
+  }
+
+  if (kosDoc.status_publikasi === 'archived') {
+    return {
+      allowed: false,
+      status: 400,
+      message: 'Listing kos ini sedang diarsipkan, percakapan bersifat hanya-baca (read-only)',
+    };
+  }
+
+  if (kosDoc.status_moderasi === 'suspended') {
+    return {
+      allowed: false,
+      status: 400,
+      message: 'Listing kos ini sedang ditangguhkan oleh pengelola (suspended), percakapan bersifat hanya-baca',
+    };
+  }
+
+  const owner = kosDoc.pemilik_id;
+  if (owner && typeof owner === 'object' && owner.status === 'suspended') {
+    return {
+      allowed: false,
+      status: 400,
+      message: 'Akun pemilik kos sedang dibatasi, percakapan bersifat hanya-baca',
+    };
+  }
+
+  return { allowed: true };
+}
+
 const sendInquiry = async (req, res, next) => {
   try {
-    const { kos_id, pesan } = req.body;
+    const { kos_id, pesan, client_msg_id } = req.body;
 
     if (!kos_id || !pesan) {
       return res.status(400).json({
@@ -17,39 +76,100 @@ const sendInquiry = async (req, res, next) => {
       });
     }
 
+    const teksTrim = typeof pesan === 'string' ? pesan.trim() : '';
+    if (!teksTrim) {
+      return res.status(422).json({
+        success: false,
+        message: 'Pesan pertanyaan tidak boleh hanya berupa spasi',
+      });
+    }
+
+    if (teksTrim.length > 1000) {
+      return res.status(422).json({
+        success: false,
+        message: 'Pesan pertanyaan maksimal 1000 karakter',
+      });
+    }
+
     const kos = await Kos.findById(kos_id).populate('pemilik_id', 'status');
     if (!kos) {
       return res.status(404).json({ success: false, message: 'Kos tidak ditemukan' });
     }
 
-    if (!isKosPubliclyVisible(kos)) {
-      return res.status(400).json({
-        success: false,
-        message: 'Kos belum disetujui untuk publik sehingga belum dapat menerima pertanyaan',
-      });
+    const policy = evaluateMessagingPolicy(kos, req.user);
+    if (!policy.allowed) {
+      return res.status(policy.status).json({ success: false, message: policy.message });
     }
 
-    const existing = await Inquiry.findOne({
+    // 1 Thread Stabil per (pencari, kos): Cari apakah sudah ada thread sebelumnya
+    const existingThread = await Inquiry.findOne({
       pencari_id: req.user._id,
       kos_id,
-      status: 'menunggu',
     });
-    if (existing) {
-      return res.status(409).json({
-        success: false,
-        message: PESAN_INQUIRY_DUPLIKAT,
-        data: { inquiry_id: existing._id },
+
+    if (existingThread) {
+      // Jika thread lama berstatus 'menunggu', tolak dengan 409
+      if (existingThread.status === 'menunggu') {
+        return res.status(409).json({
+          success: false,
+          message: PESAN_INQUIRY_DUPLIKAT,
+          data: { inquiry_id: existingThread._id },
+        });
+      }
+
+      // Idempotensi: periksa apakah pesan terakhir sama persis dan baru saja dikirim
+      const lastMsg =
+        existingThread.pesan_list?.[existingThread.pesan_list.length - 1];
+      if (
+        lastMsg &&
+        lastMsg.pengirim_id?.toString() === req.user._id.toString() &&
+        lastMsg.teks === teksTrim &&
+        Date.now() - new Date(lastMsg.createdAt).getTime() < 5000
+      ) {
+        return res.status(200).json({
+          success: true,
+          message: 'Pesan pertanyaan berhasil dikirim ke pemilik kos',
+          data: existingThread,
+        });
+      }
+
+      // Thread lama berstatus 'dibalas': lanjutkan thread yang sama, jangan buat dokumen baru
+      existingThread.pesan_list.push({
+        pengirim_id: req.user._id,
+        pengirim_role: 'pencari',
+        teks: teksTrim,
+      });
+      existingThread.status = 'menunggu';
+      await existingThread.save();
+
+      await kirimNotifikasi(kos.pemilik_id, {
+        tipe: 'pesan_baru',
+        judul: 'Pertanyaan baru dari calon penghuni',
+        isi: teksTrim,
+        tautan: '/pemilik/pesan',
+      });
+
+      return res.status(201).json({
+        success: true,
+        message: 'Pesan pertanyaan berhasil dikirim ke pemilik kos',
+        data: existingThread,
       });
     }
 
+    // Buat thread awal baru
     const inquiry = await Inquiry.create({
       pencari_id: req.user._id,
       pemilik_id: kos.pemilik_id?._id || kos.pemilik_id,
       kos_id,
-      pesan,
+      pesan: teksTrim,
       status: 'menunggu',
     });
-    await kirimNotifikasi(kos.pemilik_id, { tipe: 'pesan_baru', judul: 'Pertanyaan baru', isi: pesan, tautan: '/pemilik/pesan' });
+    await kirimNotifikasi(kos.pemilik_id, {
+      tipe: 'pesan_baru',
+      judul: 'Pertanyaan baru',
+      isi: teksTrim,
+      tautan: '/pemilik/pesan',
+    });
 
     res.status(201).json({
       success: true,
@@ -57,12 +177,10 @@ const sendInquiry = async (req, res, next) => {
       data: inquiry,
     });
   } catch (error) {
-    // Dua request bersamaan bisa lolos findOne di atas; unique index di Inquiry.js menahannya
     if (error.code === 11000) {
       const existing = await Inquiry.findOne({
         pencari_id: req.user._id,
         kos_id: req.body.kos_id,
-        status: 'menunggu',
       }).catch(() => null);
       return res.status(409).json({
         success: false,
@@ -125,6 +243,21 @@ const replyInquiry = async (req, res, next) => {
       });
     }
 
+    const teksTrim = typeof balasan === 'string' ? balasan.trim() : '';
+    if (!teksTrim) {
+      return res.status(400).json({
+        success: false,
+        message: 'Balasan tidak boleh hanya berupa spasi',
+      });
+    }
+
+    if (teksTrim.length > 1000) {
+      return res.status(422).json({
+        success: false,
+        message: 'Balasan maksimal 1000 karakter',
+      });
+    }
+
     const inquiry = await Inquiry.findById(req.params.id);
     if (!inquiry) {
       return res.status(404).json({ success: false, message: 'Pesan tidak ditemukan' });
@@ -137,6 +270,13 @@ const replyInquiry = async (req, res, next) => {
       });
     }
 
+    // Periksa status akun dan kos melalui helper kebijakan bersama
+    const kos = await Kos.findById(inquiry.kos_id).populate('pemilik_id', 'status');
+    const policy = evaluateMessagingPolicy(kos, req.user);
+    if (!policy.allowed) {
+      return res.status(policy.status).json({ success: false, message: policy.message });
+    }
+
     // Keputusan P1: balasan yang sudah terkirim tidak bisa diubah
     if (inquiry.status === 'dibalas') {
       return res.status(400).json({
@@ -145,10 +285,11 @@ const replyInquiry = async (req, res, next) => {
       });
     }
 
-    inquiry.balasan = balasan;
+    inquiry.balasan = teksTrim;
+    inquiry.balasan_at = new Date();
     inquiry.status = 'dibalas';
     const updated = await inquiry.save();
-    await kirimNotifikasi(inquiry.pencari_id, { tipe: 'balasan_pesan', judul: 'Pemilik membalas pertanyaanmu', isi: balasan, tautan: `/pesan?c=${inquiry._id}` });
+    await kirimNotifikasi(inquiry.pencari_id, { tipe: 'balasan_pesan', judul: 'Pemilik membalas pertanyaanmu', isi: teksTrim, tautan: `/pesan?c=${inquiry._id}` });
 
     res.status(200).json({
       success: true,
@@ -212,7 +353,7 @@ const getInquiryById = async (req, res, next) => {
  */
 const appendMessage = async (req, res, next) => {
   try {
-    const { pesan } = req.body;
+    const { pesan, client_msg_id } = req.body;
     const teksTrim = typeof pesan === 'string' ? pesan.trim() : '';
 
     if (!teksTrim) {
@@ -229,7 +370,7 @@ const appendMessage = async (req, res, next) => {
       });
     }
 
-    const inquiry = await Inquiry.findById(req.params.id).populate('kos_id', 'status_verifikasi status_publikasi status_moderasi');
+    const inquiry = await Inquiry.findById(req.params.id);
     if (!inquiry) {
       return res.status(404).json({ success: false, message: 'Percakapan tidak ditemukan' });
     }
@@ -245,19 +386,33 @@ const appendMessage = async (req, res, next) => {
       });
     }
 
-    // Periksa status akun pengguna yang aktif mengirim
-    if (req.user.status === 'suspended') {
-      return res.status(403).json({
-        success: false,
-        message: 'Akun Anda sedang dibatasi (suspended), tidak dapat mengirim pesan',
-      });
+    // Evaluasi kebijakan pengiriman pesan bersama
+    const kos = await Kos.findById(inquiry.kos_id).populate('pemilik_id', 'status');
+    const policy = evaluateMessagingPolicy(kos, req.user);
+    if (!policy.allowed) {
+      return res.status(policy.status).json({ success: false, message: policy.message });
     }
 
-    // Periksa status kos (jika kos diarsipkan atau tidak aktif, tolak pesan baru secara elegan)
-    if (!inquiry.kos_id || inquiry.kos_id.status_publikasi === 'archived' || inquiry.kos_id.status_moderasi === 'banned') {
-      return res.status(400).json({
-        success: false,
-        message: 'Listing kos ini sudah tidak aktif, pesan baru tidak dapat dikirim',
+    // Idempotensi / deduplikasi pengiriman berulang:
+    // Cek apakah pesan terakhir dari pengirim yang sama memiliki teks identik dalam jendela 3 detik
+    const lastExisting =
+      inquiry.pesan_list?.[inquiry.pesan_list.length - 1];
+    if (
+      lastExisting &&
+      lastExisting.pengirim_id.toString() === userIdStr &&
+      lastExisting.teks === teksTrim &&
+      Date.now() - new Date(lastExisting.createdAt).getTime() < 3000
+    ) {
+      return res.status(200).json({
+        success: true,
+        message: 'Pesan berhasil dikirim',
+        data: {
+          _id: lastExisting._id,
+          pengirim_id: lastExisting.pengirim_id,
+          pengirim_role: lastExisting.pengirim_role,
+          teks: lastExisting.teks,
+          createdAt: lastExisting.createdAt,
+        },
       });
     }
 
@@ -298,6 +453,13 @@ const appendMessage = async (req, res, next) => {
         pengirim_id: savedMessage.pengirim_id,
         pengirim_role: savedMessage.pengirim_role,
         teks: savedMessage.teks,
+        createdAt: savedMessage.createdAt,
+      },
+    });
+  } catch (error) {
+    next(error);
+  }
+};
         createdAt: savedMessage.createdAt,
       },
     });
