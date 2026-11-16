@@ -9,8 +9,9 @@ export async function listInquiryPemilik(signal?: AbortSignal): Promise<OwnerInq
 }
 
 /** GET /api/inquiries/:id  (target: GET /inquiry/:id) */
-export async function getInquiryDetail(id: string, signal?: AbortSignal): Promise<OwnerInquiryDetail> {
-  const result = await apiRequest<ApiResult<OwnerInquiryDetail>>(`/inquiries/${encodeURIComponent(id)}`, { signal });
+export async function getInquiryDetail(id: string, signal?: AbortSignal, before?: string): Promise<OwnerInquiryDetail> {
+  const query = before ? `?before=${encodeURIComponent(before)}` : '';
+  const result = await apiRequest<ApiResult<OwnerInquiryDetail>>(`/inquiries/${encodeURIComponent(id)}${query}`, { signal });
   return result.data;
 }
 

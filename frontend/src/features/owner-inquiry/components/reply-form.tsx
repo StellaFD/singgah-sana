@@ -1,5 +1,6 @@
 'use client';
 
+import { useRef } from 'react';
 import { useForm, useWatch } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { Send } from 'lucide-react';
@@ -7,7 +8,7 @@ import { Button } from '@/components/owner-ui/button';
 import { Field, Textarea, describedBy } from '@/components/owner-ui/field';
 import { useToast } from '@/components/owner-ui/toast';
 import { errorMessage } from '@/lib/owner/api/client';
-import { balasInquiry, kirimPesanPemilik } from '../api';
+import { kirimPesanPemilik } from '../api';
 import { balasanSchema, type BalasanValues } from '../schema';
 import type { OwnerInquiry } from '../types';
 
@@ -31,26 +32,34 @@ export function ReplyForm({ inquiry, onReplied }: ReplyFormProps) {
     mode: 'onTouched',
   });
   const length = useWatch({ control, name: 'balasan' })?.length ?? 0;
+  const pendingClientMsgIdRef = useRef<{ text: string; id: string } | null>(null);
 
   const onSubmit = handleSubmit(async (values) => {
     try {
       const teks = values.balasan.trim();
-      const clientMsgId = `owner-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`;
-      if (inquiry.status === 'menunggu' && !inquiry.balasan) {
-        // Balasan pertama menggunakan endpoint reply kanonikal
-        const result = await balasInquiry(inquiry._id, teks);
-        onReplied({ ...inquiry, balasan: result.data.balasan, status: result.data.status, updatedAt: result.data.updatedAt });
-      } else {
-        // Pesan lanjutan menggunakan endpoint messages multi-turn dengan client_msg_id
-        const result = await kirimPesanPemilik(inquiry._id, teks, clientMsgId);
-        const existingList = inquiry.pesan_list || [];
-        onReplied({
-          ...inquiry,
-          status: 'dibalas',
-          pesan_list: [...existingList, result.data],
-          updatedAt: result.data.createdAt,
-        });
+      if (!pendingClientMsgIdRef.current || pendingClientMsgIdRef.current.text !== teks) {
+        pendingClientMsgIdRef.current = {
+          text: teks,
+          id: `owner-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`,
+        };
       }
+      const clientMsgId = pendingClientMsgIdRef.current.id;
+
+      // Gunakan endpoint messages multi-turn terpadu dengan idempotensi client_msg_id
+      const result = await kirimPesanPemilik(inquiry._id, teks, clientMsgId);
+      const existingList = inquiry.pesan_list || [];
+      const updatedList = existingList.some((m) => m._id === result.data._id)
+        ? existingList
+        : [...existingList, result.data];
+
+      onReplied({
+        ...inquiry,
+        status: 'dibalas',
+        pesan_list: updatedList,
+        updatedAt: result.data.createdAt,
+      });
+
+      pendingClientMsgIdRef.current = null;
       reset();
       toast.success('Pesan balasan terkirim.');
     } catch (error) {

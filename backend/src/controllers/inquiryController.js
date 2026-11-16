@@ -144,18 +144,66 @@ const sendInquiry = async (req, res, next) => {
     }).sort({ updatedAt: -1 });
 
     if (existingThread) {
-      // Idempotensi berbasis client_msg_id
+      // Idempotensi berbasis client_msg_id dengan pembaruan atomik
       if (clientMsgId) {
-        const duplicateMsg = existingThread.pesan_list?.find(
-          (m) => m.client_msg_id === clientMsgId
-        );
-        if (duplicateMsg) {
+        if (existingThread.client_msg_id === clientMsgId) {
           return res.status(200).json({
             success: true,
             message: 'Pesan sudah terkirim (idempotent)',
             data: existingThread,
           });
         }
+        const alreadyExists = existingThread.pesan_list?.find(
+          (m) => m.client_msg_id === clientMsgId
+        );
+        if (alreadyExists) {
+          return res.status(200).json({
+            success: true,
+            message: 'Pesan sudah terkirim (idempotent)',
+            data: existingThread,
+          });
+        }
+
+        const updated = await Inquiry.findOneAndUpdate(
+          {
+            _id: existingThread._id,
+            'pesan_list.client_msg_id': { $ne: clientMsgId },
+          },
+          {
+            $push: {
+              pesan_list: {
+                pengirim_id: req.user._id,
+                pengirim_role: 'pencari',
+                teks: teksTrim,
+                client_msg_id: clientMsgId,
+              },
+            },
+            $set: { status: 'menunggu' },
+          },
+          { new: true }
+        );
+
+        if (!updated) {
+          const current = await Inquiry.findById(existingThread._id);
+          return res.status(200).json({
+            success: true,
+            message: 'Pesan sudah terkirim (idempotent)',
+            data: current || existingThread,
+          });
+        }
+
+        await kirimNotifikasi(kos.pemilik_id, {
+          tipe: 'pesan_baru',
+          judul: 'Pertanyaan baru dari calon penghuni',
+          isi: teksTrim,
+          tautan: '/pemilik/pesan',
+        });
+
+        return res.status(200).json({
+          success: true,
+          message: 'Pesan berhasil ditambahkan ke percakapan',
+          data: updated,
+        });
       }
 
       // Lanjutkan thread yang sama tanpa error 409
@@ -163,7 +211,7 @@ const sendInquiry = async (req, res, next) => {
         pengirim_id: req.user._id,
         pengirim_role: 'pencari',
         teks: teksTrim,
-        client_msg_id: clientMsgId,
+        client_msg_id: null,
       });
       existingThread.status = 'menunggu';
       await existingThread.save();
@@ -188,6 +236,7 @@ const sendInquiry = async (req, res, next) => {
       pemilik_id: kos.pemilik_id?._id || kos.pemilik_id,
       kos_id,
       pesan: teksTrim,
+      client_msg_id: clientMsgId,
       status: 'menunggu',
     });
     await kirimNotifikasi(kos.pemilik_id, {
@@ -373,14 +422,24 @@ const getInquiryById = async (req, res, next) => {
       });
     }
 
-    // Dukungan batas dan pagination riwayat pesan (default 50 pesan terakhir)
+    // Dukungan batas dan pagination cursor riwayat pesan (default 50 pesan terakhir)
     const limit = Math.max(1, Math.min(100, parseInt(req.query.limit, 10) || 50));
     const fullHistory = inquiry.riwayat_pesan || [];
     const totalPesan = fullHistory.length;
 
-    // Ambil slice pesan terbaru sesuai limit
-    const pagedHistory =
-      totalPesan > limit ? fullHistory.slice(totalPesan - limit) : fullHistory;
+    let endIndex = totalPesan;
+    const beforeId = req.query.before || req.query.cursor;
+    if (beforeId) {
+      const idx = fullHistory.findIndex((m) => String(m._id) === String(beforeId));
+      if (idx !== -1) {
+        endIndex = idx;
+      }
+    }
+
+    const startIndex = Math.max(0, endIndex - limit);
+    const pagedHistory = fullHistory.slice(startIndex, endIndex);
+    const hasMore = startIndex > 0;
+    const oldestCursor = pagedHistory.length > 0 ? pagedHistory[0]._id : null;
 
     res.status(200).json({
       success: true,
@@ -394,7 +453,8 @@ const getInquiryById = async (req, res, next) => {
         pagination: {
           total_pesan: totalPesan,
           limit,
-          has_more: totalPesan > limit,
+          has_more: hasMore,
+          oldest_cursor: oldestCursor,
         },
         createdAt: inquiry.createdAt,
         updatedAt: inquiry.updatedAt,
@@ -465,8 +525,19 @@ const appendMessage = async (req, res, next) => {
         ? client_msg_id.trim().slice(0, 64)
         : null;
 
-    // Idempotensi berbasis client_msg_id: jika ada pesan dengan client_msg_id yang sama persis
+    const rolePengirim = isPencari ? 'pencari' : 'pemilik';
+    const pesanBaru = {
+      pengirim_id: req.user._id,
+      pengirim_role: rolePengirim,
+      teks: teksTrim,
+      client_msg_id: clientMsgId,
+    };
+
+    const targetUserId = isPencari ? inquiry.pemilik_id : inquiry.pencari_id;
+    const targetTautan = isPencari ? '/pemilik/pesan' : `/pesan?c=${inquiry._id}`;
+
     if (clientMsgId) {
+      // 1. Cek idempotensi pada dokumen saat ini
       const existingMessage = inquiry.pesan_list?.find(
         (m) => m.client_msg_id === clientMsgId
       );
@@ -484,29 +555,72 @@ const appendMessage = async (req, res, next) => {
           },
         });
       }
-    }
 
-    const rolePengirim = isPencari ? 'pencari' : 'pemilik';
-    const pesanBaru = {
-      pengirim_id: req.user._id,
-      pengirim_role: rolePengirim,
-      teks: teksTrim,
-      client_msg_id: clientMsgId,
-    };
+      // 2. Pembaruan atomik: cegah balapan request bersamaan dengan syarat pesan_list.client_msg_id belum ada
+      const updatedInquiry = await Inquiry.findOneAndUpdate(
+        {
+          _id: inquiry._id,
+          'pesan_list.client_msg_id': { $ne: clientMsgId },
+        },
+        {
+          $push: { pesan_list: pesanBaru },
+          $set: {
+            status: rolePengirim === 'pencari' ? 'menunggu' : 'dibalas',
+          },
+        },
+        { new: true }
+      );
+
+      if (!updatedInquiry) {
+        // Balapan konkurensi: request kembar telah memasukkan client_msg_id tersebut
+        const current = await Inquiry.findById(inquiry._id);
+        const dup = current?.pesan_list?.find(
+          (m) => m.client_msg_id === clientMsgId
+        );
+        if (dup) {
+          return res.status(200).json({
+            success: true,
+            message: 'Pesan sudah tersimpan sebelumnya (idempotent)',
+            data: {
+              _id: dup._id,
+              pengirim_id: dup.pengirim_id,
+              pengirim_role: dup.pengirim_role,
+              teks: dup.teks,
+              client_msg_id: dup.client_msg_id,
+              createdAt: dup.createdAt,
+            },
+          });
+        }
+      }
+
+      await kirimNotifikasi(targetUserId, {
+        tipe: 'pesan_baru',
+        judul: isPencari ? 'Pesan baru dari calon penghuni' : 'Balasan baru dari pemilik kos',
+        isi: teksTrim,
+        tautan: targetTautan,
+      });
+
+      const savedMessage =
+        updatedInquiry.pesan_list[updatedInquiry.pesan_list.length - 1];
+
+      return res.status(201).json({
+        success: true,
+        message: 'Pesan berhasil dikirim',
+        data: {
+          _id: savedMessage._id,
+          pengirim_id: savedMessage.pengirim_id,
+          pengirim_role: savedMessage.pengirim_role,
+          teks: savedMessage.teks,
+          client_msg_id: savedMessage.client_msg_id,
+          createdAt: savedMessage.createdAt,
+        },
+      });
+    }
 
     inquiry.pesan_list.push(pesanBaru);
-    // Jika ada pesan baru dari pencari setelah dibalas, ubah status percakapan agar pemilik melihat notifikasi
-    if (rolePengirim === 'pencari') {
-      inquiry.status = 'menunggu';
-    } else {
-      inquiry.status = 'dibalas';
-    }
-
+    inquiry.status = rolePengirim === 'pencari' ? 'menunggu' : 'dibalas';
     await inquiry.save();
 
-    // Kirim notifikasi ke lawan bicara
-    const targetUserId = isPencari ? inquiry.pemilik_id : inquiry.pencari_id;
-    const targetTautan = isPencari ? '/pemilik/pesan' : `/pesan?c=${inquiry._id}`;
     await kirimNotifikasi(targetUserId, {
       tipe: 'pesan_baru',
       judul: isPencari ? 'Pesan baru dari calon penghuni' : 'Balasan baru dari pemilik kos',

@@ -13,6 +13,7 @@ const Kos = require('../models/Kos');
 const Favorit = require('../models/Favorit');
 const Inquiry = require('../models/Inquiry');
 const Pengajuan = require('../models/Pengajuan');
+const MediaAsset = require('../models/MediaAsset');
 
 /**
  * Pengaman ketat: Tolak eksekusi jika terdeteksi URI non-demo atau cloud database.
@@ -102,6 +103,7 @@ const seedData = async () => {
       await Favorit.deleteMany();
       await Inquiry.deleteMany();
       await Pengajuan.deleteMany();
+      await MediaAsset.deleteMany();
       console.log('[Seeder] Data simulasi lama dibersihkan (CONFIRM_DEMO_CLEAR=true).');
     } else {
       console.log('[Seeder] Mode non-destruktif: tidak menghapus data yang ada secara otomatis.');
@@ -403,6 +405,25 @@ const seedData = async () => {
     // 3. Hubungkan Data Pending dengan Dokumen Pengajuan Kanonikal
     const pendingKos = insertedKos.find((k) => k.status_verifikasi === 'pending');
     if (pendingKos) {
+      const pendingMediaAssets = await Promise.all(
+        (pendingKos.foto || []).map(async (url, idx) => {
+          return await MediaAsset.findOneAndUpdate(
+            { user_id: pendingKos.pemilik_id, url },
+            {
+              user_id: pendingKos.pemilik_id,
+              storage_kind: 'legacy_remote',
+              url,
+              alt: `${pendingKos.nama} - Foto ${idx + 1}`,
+              original_filename: `foto-${idx + 1}.jpg`,
+              mime_type: 'image/jpeg',
+              file_size: null,
+              is_deleted: false,
+            },
+            { upsert: true, new: true }
+          );
+        })
+      );
+
       await Pengajuan.findOneAndUpdate(
         { kos_id: pendingKos._id, jenis: 'baru', status: 'pending' },
         {
@@ -418,7 +439,7 @@ const seedData = async () => {
           catatan_verifikasi: null,
           reviewed_at: null,
           reviewed_by: null,
-          foto_ids: [],
+          foto_ids: pendingMediaAssets.map((a) => a._id),
           before: null,
           after: {
             nama: pendingKos.nama,
@@ -432,7 +453,11 @@ const seedData = async () => {
             peraturan: pendingKos.peraturan,
             luas_kamar: pendingKos.luas_kamar,
             jumlah_kamar_total: pendingKos.jumlah_kamar_total,
-            foto: pendingKos.foto,
+            foto: pendingMediaAssets.map((a) => ({
+              asset_id: a._id,
+              url: a.url,
+              alt: a.alt,
+            })),
           },
         },
         { upsert: true }
@@ -443,6 +468,25 @@ const seedData = async () => {
     // 4. Hubungkan Data Rejected dengan Dokumen Pengajuan Kanonikal
     const rejectedKos = insertedKos.find((k) => k.status_verifikasi === 'rejected');
     if (rejectedKos) {
+      const rejectedMediaAssets = await Promise.all(
+        (rejectedKos.foto || []).map(async (url, idx) => {
+          return await MediaAsset.findOneAndUpdate(
+            { user_id: rejectedKos.pemilik_id, url },
+            {
+              user_id: rejectedKos.pemilik_id,
+              storage_kind: 'legacy_remote',
+              url,
+              alt: `${rejectedKos.nama} - Foto ${idx + 1}`,
+              original_filename: `foto-${idx + 1}.jpg`,
+              mime_type: 'image/jpeg',
+              file_size: null,
+              is_deleted: false,
+            },
+            { upsert: true, new: true }
+          );
+        })
+      );
+
       await Pengajuan.findOneAndUpdate(
         { kos_id: rejectedKos._id, jenis: 'baru', status: 'rejected' },
         {
@@ -458,7 +502,7 @@ const seedData = async () => {
           catatan_verifikasi: rejectedKos.catatan_verifikasi,
           reviewed_at: new Date(),
           reviewed_by: admin._id,
-          foto_ids: [],
+          foto_ids: rejectedMediaAssets.map((a) => a._id),
           before: null,
           after: {
             nama: rejectedKos.nama,
@@ -472,7 +516,11 @@ const seedData = async () => {
             peraturan: rejectedKos.peraturan,
             luas_kamar: rejectedKos.luas_kamar,
             jumlah_kamar_total: rejectedKos.jumlah_kamar_total,
-            foto: rejectedKos.foto,
+            foto: rejectedMediaAssets.map((a) => ({
+              asset_id: a._id,
+              url: a.url,
+              alt: a.alt,
+            })),
           },
         },
         { upsert: true }

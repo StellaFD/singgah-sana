@@ -25,8 +25,15 @@ export interface InquiryDetailDto {
     pengirim_id: string;
     pengirim_role: 'pencari' | 'pemilik';
     teks: string;
+    client_msg_id?: string | null;
     createdAt: string;
   }>;
+  pagination?: {
+    total_pesan: number;
+    limit: number;
+    has_more: boolean;
+    oldest_cursor?: string | null;
+  };
   createdAt: string;
   updatedAt: string;
 }
@@ -65,32 +72,33 @@ export const inquiryApi = {
     });
   },
 
+  getDetail: async (
+    id: string,
+    signal?: AbortSignal,
+    before?: string
+  ): Promise<{ messages: Pesan[]; pagination?: InquiryDetailDto['pagination'] }> => {
+    const url = before
+      ? `/inquiry/${encodeURIComponent(id)}?before=${encodeURIComponent(before)}`
+      : `/inquiry/${encodeURIComponent(id)}`;
+    const detail = (await api.get<InquiryDetailDto>(url, { signal })).data;
+    const messages = (detail.riwayat_pesan || []).map((m) => ({
+      id: m._id,
+      dari: m.pengirim_role === 'pencari' ? ('saya' as const) : ('lawan' as const),
+      isi: m.teks,
+      waktu: m.createdAt,
+      client_msg_id: m.client_msg_id || null,
+      status: 'terkirim' as const,
+    }));
+    return { messages, pagination: detail.pagination };
+  },
+
   messages: async (id: string, signal?: AbortSignal): Promise<Pesan[]> => {
-    try {
-      const detail = (await api.get<InquiryDetailDto>(`/inquiry/${encodeURIComponent(id)}`, { signal })).data;
-      return (detail.riwayat_pesan || []).map((m) => ({
-        id: m._id,
-        dari: m.pengirim_role === 'pencari' ? ('saya' as const) : ('lawan' as const),
-        isi: m.teks,
-        waktu: m.createdAt,
-        status: 'terkirim' as const,
-      }));
-    } catch {
-      // Fallback ke list jika endpoint detail belum merespons
-      const all = await records(signal);
-      const item = all.find((r) => r._id === id);
-      if (!item) throw new Error('Pertanyaan tidak ditemukan.');
-      return [
-        { id: item._id + '-q', dari: 'saya' as const, isi: item.pesan, waktu: item.createdAt, status: 'terkirim' as const },
-        ...(item.balasan
-          ? [{ id: item._id + '-a', dari: 'lawan' as const, isi: item.balasan, waktu: item.updatedAt, status: 'terkirim' as const }]
-          : []),
-      ];
-    }
+    const res = await inquiryApi.getDetail(id, signal);
+    return res.messages;
   },
 
   send: async (id: string, isi: string, clientMsgId?: string): Promise<Pesan> => {
-    const res = await api.post<{ _id: string; pengirim_id: string; pengirim_role: string; teks: string; createdAt: string }>(
+    const res = await api.post<{ _id: string; pengirim_id: string; pengirim_role: string; teks: string; client_msg_id?: string; createdAt: string }>(
       `/inquiry/${encodeURIComponent(id)}/messages`,
       { pesan: isi, client_msg_id: clientMsgId }
     );
@@ -99,6 +107,7 @@ export const inquiryApi = {
       dari: 'saya',
       isi: res.data.teks,
       waktu: res.data.createdAt,
+      client_msg_id: res.data.client_msg_id || clientMsgId || null,
       status: 'terkirim',
     };
   },

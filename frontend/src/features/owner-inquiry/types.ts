@@ -29,6 +29,12 @@ export type OwnerInquiryDetail = {
   pencari: { _id: string; nama: string; nomor_telepon?: string; email?: string } | null;
   pemilik: { _id: string; nama: string; nomor_telepon?: string; email?: string };
   riwayat_pesan: ChatMessage[];
+  pagination?: {
+    total_pesan?: number;
+    limit?: number;
+    has_more: boolean;
+    oldest_cursor?: string | null;
+  };
   createdAt: string;
   updatedAt: string;
 };

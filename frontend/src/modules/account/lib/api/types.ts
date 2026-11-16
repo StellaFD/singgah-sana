@@ -116,6 +116,7 @@ export interface Pesan {
   isi: string;
   waktu: string;
   status: PesanStatus;
+  client_msg_id?: string | null;
 }
 
 export type KategoriLaporan = "harga" | "foto" | "alamat" | "ketersediaan" | "lainnya";

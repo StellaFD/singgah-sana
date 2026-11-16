@@ -66,6 +66,12 @@ const inquirySchema = new mongoose.Schema(
       type: Date,
       default: null,
     },
+    client_msg_id: {
+      type: String,
+      default: null,
+      trim: true,
+      maxlength: [64, 'client_msg_id maksimal 64 karakter'],
+    },
     status: {
       type: String,
       enum: ['menunggu', 'dibalas'],
@@ -94,6 +100,7 @@ inquirySchema.virtual('riwayat_pesan').get(function () {
       pengirim_id: this.pencari_id?._id || this.pencari_id,
       pengirim_role: 'pencari',
       teks: this.pesan,
+      client_msg_id: this.client_msg_id || null,
       createdAt: this.createdAt || null,
     });
   }

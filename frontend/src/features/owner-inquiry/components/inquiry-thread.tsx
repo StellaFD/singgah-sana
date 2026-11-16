@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { Mail, Phone } from 'lucide-react';
 import { Badge } from '@/components/owner-ui/badge';
 import { formatDate, formatRelativeShort } from '@/lib/owner/format';
@@ -14,6 +14,38 @@ type InquiryThreadProps = {
 export function InquiryThread({ inquiry, onReplied }: InquiryThreadProps) {
   const pencari = inquiry.pencari_id;
   const [detail, setDetail] = useState<OwnerInquiryDetail | null>(null);
+  const oldestCursorRef = useRef<string | null>(null);
+  const [loadingOlder, setLoadingOlder] = useState(false);
+
+  const loadOlderMessages = async () => {
+    const cursor = oldestCursorRef.current;
+    if (!cursor || loadingOlder) return;
+    setLoadingOlder(true);
+    try {
+      const older = await getInquiryDetail(inquiry._id, undefined, cursor);
+      oldestCursorRef.current = older.pagination?.oldest_cursor ?? null;
+      setDetail((prev) => {
+        if (!prev) return older;
+        const currentIds = new Set(prev.riwayat_pesan.map((m) => m._id));
+        const newOlder = older.riwayat_pesan.filter((m) => !currentIds.has(m._id));
+        return {
+          ...prev,
+          riwayat_pesan: [...newOlder, ...prev.riwayat_pesan],
+          pagination: older.pagination
+            ? {
+                ...older.pagination,
+                has_more: !!older.pagination.has_more,
+                oldest_cursor: oldestCursorRef.current,
+              }
+            : undefined,
+        };
+      });
+    } catch {
+      // Biarkan tombol aktif kembali untuk dicoba ulang
+    } finally {
+      setLoadingOlder(false);
+    }
+  };
 
   // Muat riwayat obrolan lengkap dan polling saat tab aktif dengan dynamic chained timeout & AbortController
   useEffect(() => {
@@ -40,7 +72,26 @@ export function InquiryThread({ inquiry, onReplied }: InquiryThreadProps) {
       try {
         const res = await getInquiryDetail(inquiry._id, abortCtrl.signal);
         if (active) {
-          setDetail(res);
+          setDetail((prev) => {
+            if (!prev) {
+              oldestCursorRef.current = res.pagination?.oldest_cursor ?? null;
+              return res;
+            }
+            // Merge pesan: pertahankan pesan lama yang sudah dimuat sebelumnya
+            const newIds = new Set(res.riwayat_pesan.map((m) => m._id));
+            const olderLoaded = prev.riwayat_pesan.filter((m) => !newIds.has(m._id));
+            return {
+              ...res,
+              riwayat_pesan: [...olderLoaded, ...res.riwayat_pesan],
+              pagination: res.pagination
+                ? {
+                    ...res.pagination,
+                    has_more: prev.pagination?.has_more ?? res.pagination.has_more,
+                    oldest_cursor: oldestCursorRef.current ?? res.pagination.oldest_cursor ?? null,
+                  }
+                : prev.pagination,
+            };
+          });
           delayMs = 3500; // Reset ke normal saat berhasil
         }
       } catch {
@@ -127,6 +178,18 @@ export function InquiryThread({ inquiry, onReplied }: InquiryThreadProps) {
       </div>
 
       <div className="flex flex-col gap-3">
+        {detail?.pagination?.has_more && (
+          <div className="flex justify-center py-1">
+            <button
+              type="button"
+              disabled={loadingOlder}
+              onClick={loadOlderMessages}
+              className="text-xs font-medium text-brand hover:underline disabled:opacity-50"
+            >
+              {loadingOlder ? 'Memuat pesan sebelumnya…' : 'Muat pesan sebelumnya'}
+            </button>
+          </div>
+        )}
         {messages.map((m) => {
           const isMe = m.pengirim_role === 'pemilik';
           return (
