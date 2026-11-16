@@ -52,13 +52,14 @@ const Select = React.forwardRef<HTMLSelectElement, SelectProps>(function Select(
         <select
           ref={ref}
           id={selectId}
+          required={required}
           value={value}
           onChange={onChange}
           disabled={disabled}
           aria-invalid={error ? true : undefined}
           aria-describedby={describedBy}
           className={`
-            block w-full appearance-none rounded-lg border bg-white px-3.5 py-2.5 pr-10 text-sm text-ink
+            block w-full h-12 appearance-none rounded-xl border bg-white px-3.5 pr-10 text-sm text-ink
             transition-colors duration-150 focus:outline-none focus:ring-2 focus:ring-brand-primary focus:border-brand-primary
             focus-visible:ring-2 focus-visible:ring-brand-primary focus-visible:border-brand-primary
             disabled:bg-surface-muted disabled:text-ink-muted disabled:cursor-not-allowed
