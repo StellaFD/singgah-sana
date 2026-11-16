@@ -1,285 +1,343 @@
+/**
+ * Utilitas Seeder Data Simulasi Lokal - Singgah Sana
+ *
+ * PERINGATAN KEAMANAN:
+ * Script ini HANYA boleh dijalankan pada database demo lokal atau in-memory sementara.
+ * Script secara ketat MENOLAK koneksi ke database produksi, staging, atau MongoDB Atlas.
+ */
+
 require('dotenv').config();
 const mongoose = require('mongoose');
 const User = require('../models/User');
 const Kos = require('../models/Kos');
 const Favorit = require('../models/Favorit');
 const Inquiry = require('../models/Inquiry');
+const Pengajuan = require('../models/Pengajuan');
+
+/**
+ * Pengaman ketat: Tolak eksekusi jika terdeteksi URI non-demo atau cloud database.
+ */
+function assertSafeDemoDatabase(uri) {
+  if (!uri || typeof uri !== 'string') {
+    throw new Error('[Seeder Security Guard] URI database tidak terdefinisi.');
+  }
+
+  const normalized = uri.toLowerCase().trim();
+
+  // 1. Tolak mutlak MongoDB Atlas atau protokol SRV
+  if (normalized.includes('mongodb+srv://') || normalized.includes('.mongodb.net')) {
+    throw new Error(
+      '[Seeder Security Guard] DITOLAK: URI terdeteksi mengarah ke MongoDB Atlas/Cloud. Seeder dilarang keras menyentuh database non-lokal.'
+    );
+  }
+
+  // 2. Wajib host loopback lokal
+  const isLocalhost =
+    normalized.includes('127.0.0.1') ||
+    normalized.includes('localhost') ||
+    normalized.includes('::1');
+
+  if (!isLocalhost) {
+    throw new Error(
+      '[Seeder Security Guard] DITOLAK: Host database bukan loopback lokal (127.0.0.1 / localhost).'
+    );
+  }
+
+  // 3. Wajib nama database berlabel demo/test/dev
+  const safeDbNames = ['singgah_sana_db_demo', 'singgah_sana_demo', 'singgah_sana_dev', 'singgah_sana_db'];
+  const hasSafeDbName = safeDbNames.some((name) => normalized.includes(name));
+  if (!hasSafeDbName) {
+    throw new Error(
+      `[Seeder Security Guard] DITOLAK: Nama database harus salah satu dari: ${safeDbNames.join(', ')}`
+    );
+  }
+}
 
 const seedData = async () => {
   try {
     const mongoUri = process.env.MONGO_URI || 'mongodb://127.0.0.1:27017/singgah_sana_db';
+    
+    // Periksa keamanan sebelum koneksi
+    assertSafeDemoDatabase(mongoUri);
+
     await mongoose.connect(mongoUri);
-    console.log('[Seeder] Terhubung ke MongoDB...');
+    console.log('[Seeder] Terhubung ke database lokal aman...');
 
-    // Hapus data lama
-    await User.deleteMany();
-    await Kos.deleteMany();
-    await Favorit.deleteMany();
-    await Inquiry.deleteMany();
-    console.log('[Seeder] Data lama berhasil dibersihkan.');
+    // Jangan menghapus secara default tanpa konfirmasi eksplisit dari environment variable khusus
+    const allowClear = process.env.CONFIRM_DEMO_CLEAR === 'true';
+    if (allowClear) {
+      await User.deleteMany();
+      await Kos.deleteMany();
+      await Favorit.deleteMany();
+      await Inquiry.deleteMany();
+      await Pengajuan.deleteMany();
+      console.log('[Seeder] Data simulasi lama dibersihkan (CONFIRM_DEMO_CLEAR=true).');
+    } else {
+      console.log('[Seeder] Mode non-destruktif: tidak menghapus data yang ada secara otomatis.');
+    }
 
-    // 1. Buat Pengguna Bawaan (Menggunakan Nama & Email General)
-    const admin = await User.create({
-      nama: 'Administrator Portal',
-      email: 'admin@gmail.com',
-      password: 'AdminPassword123!',
-      nomor_telepon: '081234567890',
-      role: 'admin',
-      foto_profil: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=200&q=80',
-    });
+    // 1. Akun Pengguna Simulasi (Menggunakan domain .invalid & kontak dummy aman)
+    const admin = await User.findOneAndUpdate(
+      { email: 'admin.demo@singgah-sana.invalid' },
+      {
+        nama: 'Admin Demo Simulasi',
+        email: 'admin.demo@singgah-sana.invalid',
+        password: 'AdminPassword123!',
+        nomor_telepon: '081200000001',
+        role: 'admin',
+        foto_profil: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=200&q=80',
+      },
+      { upsert: true, new: true }
+    );
 
-    const pemilik1 = await User.create({
-      nama: 'Pemilik Kos Satu',
-      email: 'pemilik1@gmail.com',
-      password: 'PemilikPassword123!',
-      nomor_telepon: '081298765432',
-      role: 'pemilik',
-      foto_profil: 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?auto=format&fit=crop&w=200&q=80',
-    });
+    const pemilik1 = await User.findOneAndUpdate(
+      { email: 'pemilik1.demo@singgah-sana.invalid' },
+      {
+        nama: 'Pak Hendro (Simulasi Pemilik)',
+        email: 'pemilik1.demo@singgah-sana.invalid',
+        password: 'PemilikPassword123!',
+        nomor_telepon: '081200000002',
+        role: 'pemilik',
+        foto_profil: 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?auto=format&fit=crop&w=200&q=80',
+      },
+      { upsert: true, new: true }
+    );
 
-    const pemilik2 = await User.create({
-      nama: 'Pemilik Kos Dua',
-      email: 'pemilik2@gmail.com',
-      password: 'PemilikPassword123!',
-      nomor_telepon: '081311223344',
-      role: 'pemilik',
-      foto_profil: 'https://images.unsplash.com/photo-1544005313-94ddf0286df2?auto=format&fit=crop&w=200&q=80',
-    });
+    const pemilik2 = await User.findOneAndUpdate(
+      { email: 'pemilik2.demo@singgah-sana.invalid' },
+      {
+        nama: 'Ibu Ratna (Simulasi Pemilik)',
+        email: 'pemilik2.demo@singgah-sana.invalid',
+        password: 'PemilikPassword123!',
+        nomor_telepon: '081200000003',
+        role: 'pemilik',
+        foto_profil: 'https://images.unsplash.com/photo-1544005313-94ddf0286df2?auto=format&fit=crop&w=200&q=80',
+      },
+      { upsert: true, new: true }
+    );
 
-    const pencari1 = await User.create({
-      nama: 'Pencari Kos Satu',
-      email: 'pencari1@gmail.com',
-      password: 'PencariPassword123!',
-      nomor_telepon: '085712345678',
-      role: 'pencari',
-      foto_profil: 'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?auto=format&fit=crop&w=200&q=80',
-    });
+    const pencari1 = await User.findOneAndUpdate(
+      { email: 'pencari1.demo@singgah-sana.invalid' },
+      {
+        nama: 'Dimas Wicaksono (Simulasi Pencari)',
+        email: 'pencari1.demo@singgah-sana.invalid',
+        password: 'PencariPassword123!',
+        nomor_telepon: '085700000001',
+        role: 'pencari',
+        foto_profil: 'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?auto=format&fit=crop&w=200&q=80',
+      },
+      { upsert: true, new: true }
+    );
 
-    const pencari2 = await User.create({
-      nama: 'Pencari Kos Dua',
-      email: 'pencari2@gmail.com',
-      password: 'PencariPassword123!',
-      nomor_telepon: '085888999000',
-      role: 'pencari',
-      foto_profil: 'https://images.unsplash.com/photo-1494790108377-be9c29b29330?auto=format&fit=crop&w=200&q=80',
-    });
+    console.log('[Seeder] Akun pengguna simulasi (.invalid) siap.');
 
-    console.log('[Seeder] 5 Akun pengguna bawaan (general) berhasil dibuat.');
-
-    // 2. Buat Kos Contoh Realistis (Utama UGM Yogyakarta + Kota Lain)
+    // 2. Daftar Listing Kos Simulasi (Total 10: 8 Approved, 1 Pending dengan Pengajuan, 1 Rejected)
+    // Sumber foto: Stok foto arsitektur/interior bebas royalti Unsplash untuk keperluan prototipe akademik.
     const kosData = [
       {
-        nama: 'Kost Singgah Eksklusif Pogung Tipe A',
-        deskripsi: 'Kos putra eksklusif dengan fasilitas lengkap, berjarak hanya 5 menit jalan kaki dari Fakultas Teknik dan FMIPA UGM. Lingkungan tenang, asri, aman, dan dekat dengan sentra kuliner Pogung.',
+        nama: 'Kost Singgah Eksklusif Pogung (Simulasi)',
+        deskripsi: 'Data simulasi: kos putra dekat area kampus Teknik UGM. Lingkungan asri dengan sirkulasi udara baik.',
         alamat: 'Jl. Pogung Kidul No. 42B, Sinduadi, Mlati, Sleman, DI Yogyakarta',
         area_kampus: 'UGM',
         koordinat: { latitude: -7.7654, longitude: 110.3725 },
         foto: [
           'https://images.unsplash.com/photo-1522771739844-6a9f6d5f14af?auto=format&fit=crop&w=800&q=80',
           'https://images.unsplash.com/photo-1598928506311-c55ded91a20c?auto=format&fit=crop&w=800&q=80',
-          'https://images.unsplash.com/photo-1584622650111-993a426fbf0a?auto=format&fit=crop&w=800&q=80',
         ],
         harga_per_bulan: 1650000,
         tipe: 'putra',
-        fasilitas: ['AC', 'WiFi', 'Kamar Mandi Dalam', 'Water Heater', 'Kasur Springbed', 'Lemari Pakaian', 'Meja Belajar', 'Parkir Motor', 'Parkir Mobil', 'CCTV 24 Jam'],
+        fasilitas: ['AC', 'WiFi', 'Kamar Mandi Dalam', 'Water Heater', 'Kasur Springbed', 'Lemari Pakaian', 'Meja Belajar'],
         luas_kamar: '3.5 x 4 meter',
-        peraturan: ['Akses 24 Jam', 'Dilarang merokok di dalam kamar', 'Tamu lawan jenis dilarang masuk kamar'],
+        peraturan: ['Akses 24 Jam', 'Dilarang merokok di dalam kamar'],
         jumlah_kamar_total: 10,
         jumlah_kamar_tersedia: 3,
         status_verifikasi: 'approved',
         status_publikasi: 'active',
         status_moderasi: 'normal',
         version: 1,
-        catatan_verifikasi: 'Data dan izin operasional kos telah diverifikasi oleh Admin.',
+        catatan_verifikasi: 'Disetujui untuk simulasi demo portal.',
         diverifikasi_oleh: admin._id,
         diverifikasi_pada: new Date(),
         pemilik_id: pemilik1._id,
       },
       {
-        nama: 'Griya Putri Sekip UGM Asri',
-        deskripsi: 'Kos putri nyaman, bersih, dan asri. Berada tepat di sebelah barat RSUP Dr. Sardjito dan Fakultas Kedokteran, Kesehatan Masyarakat, dan Keperawatan (FKKMK) UGM. Penjaga kos ramah 24 jam.',
+        nama: 'Griya Putri Sekip UGM Asri (Simulasi)',
+        deskripsi: 'Data simulasi: kos putri dekat RS Sardjito dan Fakultas Kedokteran UGM.',
         alamat: 'Jl. Sekip Blok T No. 12, Sendowo, Sinduadi, Mlati, Sleman, DI Yogyakarta',
         area_kampus: 'UGM',
         koordinat: { latitude: -7.7698, longitude: 110.3741 },
         foto: [
           'https://images.unsplash.com/photo-1586023492125-27b2c045efd7?auto=format&fit=crop&w=800&q=80',
-          'https://images.unsplash.com/photo-1505691938895-1758d7feb511?auto=format&fit=crop&w=800&q=80',
         ],
         harga_per_bulan: 1400000,
         tipe: 'putri',
-        fasilitas: ['AC', 'WiFi', 'Kamar Mandi Dalam', 'Dapur Bersama', 'Kulkas Bersama', 'Parkir Motor', 'Penjaga Kos 24 Jam'],
+        fasilitas: ['AC', 'WiFi', 'Kamar Mandi Dalam', 'Dapur Bersama', 'Parkir Motor'],
         luas_kamar: '3 x 4 meter',
-        peraturan: ['Gerbang ditutup pukul 23:00 WIB', 'Khusus mahasiswi / karyawati', 'Dilarang membawa hewan peliharaan'],
+        peraturan: ['Gerbang ditutup pukul 23:00 WIB', 'Khusus putri'],
         jumlah_kamar_total: 12,
         jumlah_kamar_tersedia: 2,
         status_verifikasi: 'approved',
         status_publikasi: 'active',
         status_moderasi: 'normal',
         version: 1,
-        catatan_verifikasi: 'Disetujui. Lokasi valid sesuai survei titik koordinat.',
+        catatan_verifikasi: 'Disetujui untuk simulasi demo portal.',
         diverifikasi_oleh: admin._id,
         diverifikasi_pada: new Date(),
         pemilik_id: pemilik2._id,
       },
       {
-        nama: 'Kost Karangmalang Paviliun UGM/UNY',
-        deskripsi: 'Kos campur modern dan strategis, berbatasan langsung antara kampus UGM (FEB/FISIPOL) dan UNY. Sangat cocok bagi mahasiswa yang mencari hunian tenang dengan fasilitas lengkap.',
+        nama: 'Kost Karangmalang Paviliun UGM/UNY (Simulasi)',
+        deskripsi: 'Data simulasi: kos campur strategis di perbatasan kampus UGM dan UNY.',
         alamat: 'Gang Karangmalang Blok A No. 5, Caturtunggal, Depok, Sleman, DI Yogyakarta',
         area_kampus: 'UGM',
         koordinat: { latitude: -7.7725, longitude: 110.3854 },
         foto: [
           'https://images.unsplash.com/photo-1513694203232-719a280e022f?auto=format&fit=crop&w=800&q=80',
-          'https://images.unsplash.com/photo-1595526114035-0d45ed16cfbf?auto=format&fit=crop&w=800&q=80',
         ],
         harga_per_bulan: 1150000,
         tipe: 'campur',
-        fasilitas: ['WiFi', 'Kamar Mandi Dalam', 'Kasur Springbed', 'Lemari', 'Parkir Motor', 'Dapur Bersama'],
+        fasilitas: ['WiFi', 'Kamar Mandi Dalam', 'Kasur Springbed', 'Lemari', 'Parkir Motor'],
         luas_kamar: '3 x 3.5 meter',
-        peraturan: ['Akses 24 Jam dengan kartu akses gerbang', 'Iuran listrik include pemakaian wajar'],
+        peraturan: ['Akses 24 Jam dengan kartu kunci'],
         jumlah_kamar_total: 8,
         jumlah_kamar_tersedia: 4,
         status_verifikasi: 'approved',
         status_publikasi: 'active',
         status_moderasi: 'normal',
         version: 1,
-        catatan_verifikasi: 'Disetujui.',
+        catatan_verifikasi: 'Disetujui untuk simulasi demo portal.',
         diverifikasi_oleh: admin._id,
         diverifikasi_pada: new Date(),
         pemilik_id: pemilik1._id,
       },
       {
-        nama: 'D Blimbing Residence Pogung Baru UGM',
-        deskripsi: 'Kos putra modern fasilitas eksklusif, kamar mandi dalam dengan water heater, meja kerja ergonomis, smart door lock, dan area rooftop santai view Gunung Merapi.',
+        nama: 'D Blimbing Residence Pogung Baru (Simulasi)',
+        deskripsi: 'Data simulasi: kos putra fasilitas lengkap dekat Pogung Baru UGM.',
         alamat: 'Jl. Pogung Baru Blok F No. 19, Sinduadi, Mlati, Sleman, DI Yogyakarta',
         area_kampus: 'UGM',
         koordinat: { latitude: -7.7612, longitude: 110.3708 },
         foto: [
           'https://images.unsplash.com/photo-1595526114035-0d45ed16cfbf?auto=format&fit=crop&w=800&q=80',
-          'https://images.unsplash.com/photo-1502672260266-1c1ef2d93688?auto=format&fit=crop&w=800&q=80',
         ],
         harga_per_bulan: 2100000,
         tipe: 'putra',
-        fasilitas: ['AC', 'WiFi High Speed', 'Kamar Mandi Dalam', 'Water Heater', 'Smart TV', 'Kulkas Kamar', 'Laundry Gratis', 'Parkir Mobil', 'Parkir Motor'],
+        fasilitas: ['AC', 'WiFi High Speed', 'Kamar Mandi Dalam', 'Water Heater', 'Smart TV', 'Parkir Mobil'],
         luas_kamar: '4 x 4 meter',
-        peraturan: ['Bebas jam malam', 'Dilarang membuat kegaduhan di atas pukul 22:00 WIB'],
+        peraturan: ['Bebas jam malam'],
         jumlah_kamar_total: 6,
         jumlah_kamar_tersedia: 1,
         status_verifikasi: 'approved',
         status_publikasi: 'active',
         status_moderasi: 'normal',
         version: 1,
-        catatan_verifikasi: 'Disetujui. Fasilitas premium terkonfirmasi.',
+        catatan_verifikasi: 'Disetujui untuk simulasi demo portal.',
         diverifikasi_oleh: admin._id,
         diverifikasi_pada: new Date(),
         pemilik_id: pemilik1._id,
       },
       {
-        nama: 'Wisma Bougenville Kaliurang KM 5',
-        deskripsi: 'Kos putri asri sejuk di Jalan Kaliurang KM 5.2 dekat pusat kuliner Jakal, GSP UGM, dan Mirota Kampus. Lingkungan bersahabat dengan keamanan terjaga.',
+        nama: 'Wisma Bougenville Kaliurang KM 5 (Simulasi)',
+        deskripsi: 'Data simulasi: kos putri dekat Jalan Kaliurang KM 5.',
         alamat: 'Jl. Kaliurang KM 5.2 Gang Bougenville No. 8, Caturtunggal, Depok, Sleman, DI Yogyakarta',
         area_kampus: 'UGM',
         koordinat: { latitude: -7.7633, longitude: 110.3802 },
         foto: [
           'https://images.unsplash.com/photo-1502672260266-1c1ef2d93688?auto=format&fit=crop&w=800&q=80',
-          'https://images.unsplash.com/photo-1586023492125-27b2c045efd7?auto=format&fit=crop&w=800&q=80',
         ],
         harga_per_bulan: 950000,
         tipe: 'putri',
         fasilitas: ['WiFi', 'Kamar Mandi Dalam', 'Kasur Springbed', 'Lemari', 'Parkir Motor'],
         luas_kamar: '3 x 3.5 meter',
-        peraturan: ['Gerbang ditutup pukul 23:00 WIB', 'Tamu pria hanya di ruang tamu'],
+        peraturan: ['Gerbang ditutup pukul 23:00 WIB'],
         jumlah_kamar_total: 15,
         jumlah_kamar_tersedia: 2,
         status_verifikasi: 'approved',
         status_publikasi: 'active',
         status_moderasi: 'normal',
         version: 1,
-        catatan_verifikasi: 'Disetujui.',
+        catatan_verifikasi: 'Disetujui untuk simulasi demo portal.',
         diverifikasi_oleh: admin._id,
         diverifikasi_pada: new Date(),
         pemilik_id: pemilik2._id,
       },
       {
-        nama: 'D Kukusan Residence Dekat UI Depok',
-        deskripsi: 'Kos campur strategis hanya 300 meter dari Pintu Vokasi dan Teknik Universitas Indonesia (UI) Depok. Akses mudah ke Stasiun KRL UI dan Pocin.',
+        nama: 'D Kukusan Residence Dekat UI Depok (Simulasi)',
+        deskripsi: 'Data simulasi: contoh kos dekat area kampus Universitas Indonesia Depok untuk pengujian filter wilayah.',
         alamat: 'Jl. Juragan Sinda No. 24, Kukusan, Beji, Kota Depok, Jawa Barat',
         area_kampus: 'UI',
         koordinat: { latitude: -6.3685, longitude: 106.8223 },
         foto: [
           'https://images.unsplash.com/photo-1555854877-bab0e564b8d5?auto=format&fit=crop&w=800&q=80',
-          'https://images.unsplash.com/photo-1598928506311-c55ded91a20c?auto=format&fit=crop&w=800&q=80',
         ],
         harga_per_bulan: 1750000,
         tipe: 'campur',
-        fasilitas: ['AC', 'WiFi', 'Kamar Mandi Dalam', 'Water Heater', 'Parkir Motor', 'Dapur Bersama'],
+        fasilitas: ['AC', 'WiFi', 'Kamar Mandi Dalam', 'Water Heater', 'Parkir Motor'],
         luas_kamar: '3.5 x 4 meter',
-        peraturan: ['Akses 24 Jam', 'Wajib menjaga kebersihan bersama'],
+        peraturan: ['Akses 24 Jam'],
         jumlah_kamar_total: 10,
         jumlah_kamar_tersedia: 3,
         status_verifikasi: 'approved',
         status_publikasi: 'active',
         status_moderasi: 'normal',
         version: 1,
-        catatan_verifikasi: 'Disetujui.',
+        catatan_verifikasi: 'Disetujui untuk simulasi demo portal.',
         diverifikasi_oleh: admin._id,
         diverifikasi_pada: new Date(),
         pemilik_id: pemilik1._id,
       },
       {
-        nama: 'Kost Dago Pavilion Asri Dekat ITB',
-        deskripsi: 'Kos sejuk di kawasan Dago Atas, dekat gerbang depan ITB Ganesha dan Unpad Dipatiukur. Suasana tenang sangat mendukung suasana belajar.',
+        nama: 'Kost Dago Pavilion Asri Dekat ITB (Simulasi)',
+        deskripsi: 'Data simulasi: contoh kos dekat area kampus ITB Ganesha Bandung untuk pengujian filter wilayah.',
         alamat: 'Jl. Dago Asri No. 45, Coblong, Kota Bandung, Jawa Barat',
         area_kampus: 'ITB',
         koordinat: { latitude: -6.8794, longitude: 107.6163 },
         foto: [
           'https://images.unsplash.com/photo-1540518614846-7ede433c4ef0?auto=format&fit=crop&w=800&q=80',
-          'https://images.unsplash.com/photo-1505691938895-1758d7feb511?auto=format&fit=crop&w=800&q=80',
         ],
         harga_per_bulan: 1850000,
         tipe: 'putra',
-        fasilitas: ['WiFi High Speed', 'AC', 'Water Heater', 'Kamar Mandi Dalam', 'Meja Belajar'],
+        fasilitas: ['WiFi High Speed', 'AC', 'Water Heater', 'Kamar Mandi Dalam'],
         luas_kamar: '3.5 x 4 meter',
-        peraturan: ['Tamu lawan jenis dilarang masuk kamar', 'Batas bertamu 22.00 WIB'],
+        peraturan: ['Tamu lawan jenis dilarang masuk kamar'],
         jumlah_kamar_total: 8,
         jumlah_kamar_tersedia: 2,
         status_verifikasi: 'approved',
         status_publikasi: 'active',
         status_moderasi: 'normal',
         version: 1,
-        catatan_verifikasi: 'Disetujui.',
+        catatan_verifikasi: 'Disetujui untuk simulasi demo portal.',
         diverifikasi_oleh: admin._id,
         diverifikasi_pada: new Date(),
         pemilik_id: pemilik2._id,
       },
       {
-        nama: 'Kost Gebang Putih Sukolilo Dekat ITS',
-        deskripsi: 'Kos putra terjangkau dan strategis, hanya 3 menit dari gerbang utama kampus Sukolilo ITS dan PENS Surabaya. Dekat warung makan dan minimarket.',
+        nama: 'Kost Gebang Putih Sukolilo Dekat ITS (Simulasi)',
+        deskripsi: 'Data simulasi: contoh kos dekat kampus Sukolilo ITS Surabaya untuk pengujian filter wilayah.',
         alamat: 'Jl. Gebang Putih Gang 4 No. 18, Sukolilo, Kota Surabaya, Jawa Timur',
         area_kampus: 'ITS',
         koordinat: { latitude: -7.2831, longitude: 112.7938 },
         foto: [
           'https://images.unsplash.com/photo-1513694203232-719a280e022f?auto=format&fit=crop&w=800&q=80',
-          'https://images.unsplash.com/photo-1522771739844-6a9f6d5f14af?auto=format&fit=crop&w=800&q=80',
         ],
         harga_per_bulan: 1200000,
         tipe: 'putra',
-        fasilitas: ['AC', 'WiFi', 'Kamar Mandi Dalam', 'Parkir Motor Luas', 'Dapur Bersama'],
+        fasilitas: ['AC', 'WiFi', 'Kamar Mandi Dalam', 'Parkir Motor Luas'],
         luas_kamar: '3 x 3 meter',
-        peraturan: ['Akses 24 jam dengan gerbang gembok kode', 'Dilarang merokok di dalam kamar'],
+        peraturan: ['Akses 24 jam'],
         jumlah_kamar_total: 10,
         jumlah_kamar_tersedia: 4,
         status_verifikasi: 'approved',
         status_publikasi: 'active',
         status_moderasi: 'normal',
         version: 1,
-        catatan_verifikasi: 'Disetujui.',
+        catatan_verifikasi: 'Disetujui untuk simulasi demo portal.',
         diverifikasi_oleh: admin._id,
         diverifikasi_pada: new Date(),
         pemilik_id: pemilik1._id,
       },
       {
-        nama: 'Kos Pogung Raya Indah (Menunggu Verifikasi)',
-        deskripsi: 'Pendaftaran kos baru oleh pemilik. Memiliki 8 kamar dengan tarif bersaing di Pogung.',
+        nama: 'Kos Pogung Raya Indah (Simulasi Antrean Pending)',
+        deskripsi: 'Data simulasi: kos baru yang diajukan pemilik dan sedang menunggu peninjauan admin pada antrean pengajuan.',
         alamat: 'Jl. Pogung Raya No. 99, Sinduadi, Mlati, Sleman, DI Yogyakarta',
         area_kampus: 'UGM',
         koordinat: { latitude: -7.7645, longitude: 110.3719 },
@@ -293,12 +351,12 @@ const seedData = async () => {
         peraturan: ['Akses 24 Jam'],
         jumlah_kamar_total: 8,
         jumlah_kamar_tersedia: 5,
-        status_verifikasi: 'pending', // Menunggu verifikasi admin untuk pengujian
+        status_verifikasi: 'pending',
         pemilik_id: pemilik1._id,
       },
       {
-        nama: 'Griya Melati Monjali (Pendaftaran Ditolak)',
-        deskripsi: 'Kos dekat Monjali.',
+        nama: 'Griya Melati Monjali (Simulasi Ditolak)',
+        deskripsi: 'Data simulasi: kos yang ditolak admin karena data tidak lengkap.',
         alamat: 'Jl. Monjali Gang Melati No. 3, Sleman, DI Yogyakarta',
         area_kampus: 'UGM',
         koordinat: { latitude: -7.7550, longitude: 110.3680 },
@@ -313,46 +371,129 @@ const seedData = async () => {
         jumlah_kamar_total: 5,
         jumlah_kamar_tersedia: 2,
         status_verifikasi: 'rejected',
-        catatan_verifikasi: 'Ditolak: Foto properti buram dan nomor telepon penanggung jawab tidak dapat dihubungi saat dikonfirmasi.',
+        catatan_verifikasi: 'Ditolak: data simulasi kelengkapan berkas tidak memenuhi syarat verifikasi.',
         diverifikasi_oleh: admin._id,
         diverifikasi_pada: new Date(),
         pemilik_id: pemilik1._id,
       },
     ];
 
-    const insertedKos = await Kos.insertMany(kosData);
-    console.log(`[Seeder] ${insertedKos.length} Data kos berhasil dimasukkan.`);
+    const insertedKos = [];
+    for (const data of kosData) {
+      const kosDoc = await Kos.findOneAndUpdate({ nama: data.nama }, data, { upsert: true, new: true });
+      insertedKos.push(kosDoc);
+    }
+    console.log(`[Seeder] ${insertedKos.length} Data kos simulasi siap.`);
 
-    // 3. Tambahkan Favorit contoh untuk Pencari 1
-    await Favorit.create({
-      user_id: pencari1._id,
-      kos_id: insertedKos[0]._id, // Kos Singgah Eksklusif Pogung
-    });
+    // 3. Hubungkan Data Pending dengan Dokumen Pengajuan Kanonikal
+    const pendingKos = insertedKos.find((k) => k.status_verifikasi === 'pending');
+    if (pendingKos) {
+      await Pengajuan.findOneAndUpdate(
+        { kos_id: pendingKos._id, jenis: 'baru', status: 'pending' },
+        {
+          kos_id: pendingKos._id,
+          pemilik_id: pendingKos.pemilik_id,
+          jenis: 'baru',
+          status: 'pending',
+          is_active: true,
+          version: 1,
+          base_version: 1,
+          before: null,
+          after: {
+            nama: pendingKos.nama,
+            deskripsi: pendingKos.deskripsi,
+            alamat: pendingKos.alamat,
+            area_kampus: pendingKos.area_kampus,
+            koordinat: pendingKos.koordinat,
+            harga_per_bulan: pendingKos.harga_per_bulan,
+            tipe: pendingKos.tipe,
+            fasilitas: pendingKos.fasilitas,
+            peraturan: pendingKos.peraturan,
+            luas_kamar: pendingKos.luas_kamar,
+            jumlah_kamar_total: pendingKos.jumlah_kamar_total,
+            foto: pendingKos.foto,
+          },
+        },
+        { upsert: true }
+      );
+      console.log('[Seeder] Dokumen Pengajuan kanonikal untuk listing pending berhasil dikaitkan.');
+    }
 
-    // 4. Tambahkan Inquiry contoh dari Pencari 1 ke Kos 1
-    await Inquiry.create({
-      pencari_id: pencari1._id,
-      pemilik_id: pemilik1._id,
-      kos_id: insertedKos[0]._id,
-      pesan: 'Selamat siang, apakah untuk kamar nomor 3 masih tersedia jika saya ingin survei besok sore?',
-      balasan: 'Siang, masih ada. Silakan datang besok jam 16:00 ya.',
-      status: 'dibalas',
-    });
+    // 4. Hubungkan Data Rejected dengan Dokumen Pengajuan Kanonikal
+    const rejectedKos = insertedKos.find((k) => k.status_verifikasi === 'rejected');
+    if (rejectedKos) {
+      await Pengajuan.findOneAndUpdate(
+        { kos_id: rejectedKos._id, jenis: 'baru', status: 'rejected' },
+        {
+          kos_id: rejectedKos._id,
+          pemilik_id: rejectedKos.pemilik_id,
+          jenis: 'baru',
+          status: 'rejected',
+          is_active: false,
+          version: 1,
+          base_version: 1,
+          before: null,
+          catatan_review: rejectedKos.catatan_verifikasi,
+          after: {
+            nama: rejectedKos.nama,
+            deskripsi: rejectedKos.deskripsi,
+            alamat: rejectedKos.alamat,
+            area_kampus: rejectedKos.area_kampus,
+            koordinat: rejectedKos.koordinat,
+            harga_per_bulan: rejectedKos.harga_per_bulan,
+            tipe: rejectedKos.tipe,
+            fasilitas: rejectedKos.fasilitas,
+            peraturan: rejectedKos.peraturan,
+            luas_kamar: rejectedKos.luas_kamar,
+            jumlah_kamar_total: rejectedKos.jumlah_kamar_total,
+            foto: rejectedKos.foto,
+          },
+        },
+        { upsert: true }
+      );
+    }
 
-    console.log('[Seeder] Data favorit dan inquiry contoh berhasil dibuat.');
+    // 5. Tambahkan Favorit contoh simulasi
+    await Favorit.findOneAndUpdate(
+      { user_id: pencari1._id, kos_id: insertedKos[0]._id },
+      { user_id: pencari1._id, kos_id: insertedKos[0]._id },
+      { upsert: true }
+    );
+
+    // 6. Tambahkan Thread Percakapan contoh simulasi
+    await Inquiry.findOneAndUpdate(
+      { pencari_id: pencari1._id, kos_id: insertedKos[0]._id },
+      {
+        pencari_id: pencari1._id,
+        pemilik_id: pemilik1._id,
+        kos_id: insertedKos[0]._id,
+        pesan: 'Selamat siang, apakah untuk kamar nomor 3 masih tersedia jika saya ingin survei besok sore?',
+        balasan: 'Siang, masih ada. Silakan datang besok jam 16:00 ya.',
+        balasan_at: new Date(),
+        status: 'dibalas',
+      },
+      { upsert: true }
+    );
+
+    console.log('[Seeder] Data favorit dan percakapan simulasi siap.');
     console.log('===========================================================');
-    console.log('🎉 SEEDING SELESAI DENGAN SUKSES!');
-    console.log('Akun Bawaan (General) untuk Pengujian:');
-    console.log('1. Admin   : admin@gmail.com    | AdminPassword123!');
-    console.log('2. Pemilik : pemilik1@gmail.com | PemilikPassword123!');
-    console.log('3. Pencari : pencari1@gmail.com | PencariPassword123!');
+    console.log('SEEDING SELESAI SECARA AMAN (LINGKUNGAN SIMULASI LOKAL)');
+    console.log('Akun Simulasi:');
+    console.log('1. Admin   : admin.demo@singgah-sana.invalid    | AdminPassword123!');
+    console.log('2. Pemilik : pemilik1.demo@singgah-sana.invalid | PemilikPassword123!');
+    console.log('3. Pencari : pencari1.demo@singgah-sana.invalid | PencariPassword123!');
     console.log('===========================================================');
 
     process.exit(0);
   } catch (error) {
-    console.error('[Seeder Error]:', error);
+    console.error('[Seeder Guard Blocked]:', error.message);
     process.exit(1);
   }
 };
 
-seedData();
+// Hanya jalankan fungsi jika dieksekusi langsung via CLI, bukan saat di-require modul lain
+if (require.main === module) {
+  seedData();
+}
+
+module.exports = { assertSafeDemoDatabase, seedData };
