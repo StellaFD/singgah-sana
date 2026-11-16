@@ -40,10 +40,10 @@ const Checkbox = React.forwardRef<HTMLInputElement, CheckboxProps>(function Chec
           checked={checked}
           disabled={disabled}
           onChange={(e) => onChange && onChange(e.target.checked)}
-          className="sr-only"
+          className="sr-only peer"
         />
         <div
-          className={`w-5 h-5 rounded border transition-colors flex items-center justify-center ${
+          className={`w-5 h-5 rounded border transition-colors flex items-center justify-center peer-focus-visible:ring-2 peer-focus-visible:ring-brand-primary peer-focus-visible:ring-offset-2 ${
             checked
               ? 'bg-brand-primary border-brand-primary text-white'
               : 'bg-white border-surface-border hover:border-ink-muted'

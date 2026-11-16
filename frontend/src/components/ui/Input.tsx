@@ -26,6 +26,11 @@ const Input = React.forwardRef<HTMLInputElement, InputProps>(function Input(
   ref
 ) {
   const inputId = id || (label ? label.toLowerCase().replace(/\s+/g, '-') : undefined);
+  const describedBy = error
+    ? inputId ? `${inputId}-error` : undefined
+    : helperText
+    ? inputId ? `${inputId}-helper` : undefined
+    : undefined;
 
   return (
     <div className="w-full font-inter">
@@ -47,13 +52,16 @@ const Input = React.forwardRef<HTMLInputElement, InputProps>(function Input(
           ref={ref}
           id={inputId}
           disabled={disabled}
+          aria-invalid={error ? true : undefined}
+          aria-describedby={describedBy}
           className={`
             block w-full rounded-lg border bg-white px-3.5 py-2.5 text-sm text-ink placeholder-ink-light
             transition-colors duration-150 focus:outline-none focus:ring-2 focus:ring-brand-primary focus:border-brand-primary
+            focus-visible:ring-2 focus-visible:ring-brand-primary focus-visible:border-brand-primary
             disabled:bg-surface-muted disabled:text-ink-muted disabled:cursor-not-allowed
             ${leftIcon ? 'pl-10' : ''}
             ${rightIcon ? 'pr-10' : ''}
-            ${error ? 'border-red-500 focus:ring-red-500 focus:border-red-500' : 'border-surface-border'}
+            ${error ? 'border-red-500 focus:ring-red-500 focus:border-red-500 focus-visible:ring-red-500' : 'border-surface-border'}
             ${className}
           `}
           {...props}
@@ -65,12 +73,12 @@ const Input = React.forwardRef<HTMLInputElement, InputProps>(function Input(
         )}
       </div>
       {error && (
-        <p className="mt-1.5 text-xs text-red-600 font-medium" role="alert">
+        <p id={inputId ? `${inputId}-error` : undefined} className="mt-1.5 text-xs text-red-600 font-medium" role="alert">
           {error}
         </p>
       )}
       {!error && helperText && (
-        <p className="mt-1.5 text-xs text-ink-muted">{helperText}</p>
+        <p id={inputId ? `${inputId}-helper` : undefined} className="mt-1.5 text-xs text-ink-muted">{helperText}</p>
       )}
     </div>
   );

@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useState } from 'react';
 import { Activity, AlertCircle, RefreshCw } from 'lucide-react';
+import Pagination from '@/components/ui/Pagination';
 import { apiRequest, ApiError } from '../../lib/api';
 import { formatAdminDate } from '../../lib/formatters';
 
@@ -340,29 +341,16 @@ export default function AdminAuditLogs({ expireSession, token }: AdminAuditLogsP
 
         {/* Pagination bar */}
         {pagination && pagination.totalPages > 1 && (
-          <div className="flex items-center justify-between border-t border-slate-200 px-4 py-3 text-sm text-slate-600">
-            <p className="text-xs text-slate-500">
-              Menampilkan hal. <span className="font-medium text-slate-800">{pagination.currentPage}</span> dari{' '}
-              <span className="font-medium text-slate-800">{pagination.totalPages}</span> ({pagination.totalData} total)
-            </p>
-            <div className="flex gap-2">
-              <button
-                type="button"
-                onClick={() => setPage((prev) => Math.max(1, prev - 1))}
-                disabled={pagination.currentPage <= 1 || isLoading}
-                className="rounded border border-slate-300 px-3 py-1 text-xs font-medium text-slate-700 hover:bg-slate-50 disabled:opacity-40"
-              >
-                Sebelumnya
-              </button>
-              <button
-                type="button"
-                onClick={() => setPage((prev) => Math.min(pagination.totalPages, prev + 1))}
-                disabled={pagination.currentPage >= pagination.totalPages || isLoading}
-                className="rounded border border-slate-300 px-3 py-1 text-xs font-medium text-slate-700 hover:bg-slate-50 disabled:opacity-40"
-              >
-                Berikutnya
-              </button>
-            </div>
+          <div className="p-4">
+            <Pagination
+              currentPage={pagination.currentPage}
+              totalPages={pagination.totalPages}
+              onPageChange={(p) => setPage(p)}
+              totalData={pagination.totalData}
+              itemCount={logs.length}
+              itemLabel="log"
+              disabled={isLoading}
+            />
           </div>
         )}
       </div>
