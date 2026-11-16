@@ -267,3 +267,99 @@ describe('GET /api/inquiries/my dan /owner (daftar pertanyaan)', () => {
     expect(res.statusCode).toBe(403);
   });
 });
+
+describe('GET /api/inquiries/:id & POST /api/inquiries/:id/messages (Multi-turn Chat Teks)', () => {
+  let pemilik;
+  let tokenPemilik;
+  let pencari;
+  let tokenPencari;
+  let kos;
+  let inquiryId;
+
+  beforeEach(async () => {
+    ({ user: pemilik, token: tokenPemilik } = await createUser('pemilik'));
+    ({ user: pencari, token: tokenPencari } = await createUser('pencari'));
+    kos = await createKos(pemilik);
+
+    const initRes = await kirimInquiry(tokenPencari, {
+      kos_id: kos._id,
+      pesan: 'Halo kak, apakah kamar mandi di dalam?',
+    });
+    inquiryId = initRes.body.data._id;
+  });
+
+  it('peserta (pencari & pemilik) bisa membaca riwayat obrolan lengkap', async () => {
+    const resPencari = await request(app)
+      .get(`/api/inquiries/${inquiryId}`)
+      .set(auth(tokenPencari));
+
+    expect(resPencari.statusCode).toBe(200);
+    expect(resPencari.body.success).toBe(true);
+    expect(resPencari.body.data.riwayat_pesan.length).toBe(1);
+    expect(resPencari.body.data.riwayat_pesan[0].teks).toBe('Halo kak, apakah kamar mandi di dalam?');
+
+    const resPemilik = await request(app)
+      .get(`/api/inquiries/${inquiryId}`)
+      .set(auth(tokenPemilik));
+
+    expect(resPemilik.statusCode).toBe(200);
+    expect(resPemilik.body.success).toBe(true);
+  });
+
+  it('menolak pengguna lain yang bukan peserta percakapan dengan 403', async () => {
+    const { token: tokenOrangLain } = await createUser('pencari');
+
+    const res = await request(app)
+      .get(`/api/inquiries/${inquiryId}`)
+      .set(auth(tokenOrangLain));
+
+    expect(res.statusCode).toBe(403);
+  });
+
+  it('pemilik dan pencari bisa saling berbalas pesan secara berurutan', async () => {
+    // 1. Pemilik membalas
+    const msg1 = await request(app)
+      .post(`/api/inquiries/${inquiryId}/messages`)
+      .set(auth(tokenPemilik))
+      .send({ pesan: 'Halo, betul kamar mandi dalam ya.' });
+
+    expect(msg1.statusCode).toBe(201);
+    expect(msg1.body.success).toBe(true);
+    expect(msg1.body.data.pengirim_role).toBe('pemilik');
+
+    // 2. Pencari membalas kembali
+    const msg2 = await request(app)
+      .post(`/api/inquiries/${inquiryId}/messages`)
+      .set(auth(tokenPencari))
+      .send({ pesan: 'Baik kak, besok sore boleh survei lokasi?' });
+
+    expect(msg2.statusCode).toBe(201);
+    expect(msg2.body.data.pengirim_role).toBe('pencari');
+
+    // 3. Verifikasi riwayat utuh tersimpan
+    const detail = await request(app)
+      .get(`/api/inquiries/${inquiryId}`)
+      .set(auth(tokenPencari));
+
+    expect(detail.statusCode).toBe(200);
+    expect(detail.body.data.riwayat_pesan.length).toBe(3);
+    expect(detail.body.data.riwayat_pesan[1].teks).toBe('Halo, betul kamar mandi dalam ya.');
+    expect(detail.body.data.riwayat_pesan[2].teks).toBe('Baik kak, besok sore boleh survei lokasi?');
+  });
+
+  it('menolak pesan kosong dengan 400 dan pesan lebih dari 1000 karakter dengan 422', async () => {
+    const resKosong = await request(app)
+      .post(`/api/inquiries/${inquiryId}/messages`)
+      .set(auth(tokenPemilik))
+      .send({ pesan: '   ' });
+
+    expect(resKosong.statusCode).toBe(400);
+
+    const resPanjang = await request(app)
+      .post(`/api/inquiries/${inquiryId}/messages`)
+      .set(auth(tokenPemilik))
+      .send({ pesan: 'x'.repeat(1001) });
+
+    expect(resPanjang.statusCode).toBe(422);
+  });
+});

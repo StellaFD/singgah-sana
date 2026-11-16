@@ -1,6 +1,6 @@
 'use client';
 
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { usePathname, useRouter, useSearchParams } from 'next/navigation';
 import { MessageCircle, Search } from 'lucide-react';
 import { PageHeader } from '@/components/owner-layout/page-header';
@@ -11,6 +11,7 @@ import { Skeleton } from '@/components/owner-ui/spinner';
 import { cn } from '@/lib/owner/cn';
 import { formatRelativeShort } from '@/lib/owner/format';
 import { useInquiryPemilik } from '../hooks';
+import { listInquiryPemilik } from '../api';
 import type { OwnerInquiry } from '../types';
 import { InquiryThread } from './inquiry-thread';
 
@@ -23,6 +24,62 @@ export function PesanView() {
   const pathname = usePathname();
   const [query, setQuery] = useState('');
   const [filter, setFilter] = useState<Filter>('semua');
+
+  // Background polling daftar percakapan hanya saat tab aktif dengan dynamic chained timeout & AbortController
+  useEffect(() => {
+    let timer: NodeJS.Timeout | null = null;
+    let active = true;
+    let abortCtrl: AbortController | null = null;
+    let delayMs = 4000;
+
+    const scheduleNext = () => {
+      if (!active) return;
+      if (timer) clearTimeout(timer);
+      timer = setTimeout(pollList, delayMs);
+    };
+
+    const pollList = async () => {
+      if (!active || document.visibilityState !== 'visible') {
+        scheduleNext();
+        return;
+      }
+
+      if (abortCtrl) abortCtrl.abort();
+      abortCtrl = new AbortController();
+
+      try {
+        const freshList = await listInquiryPemilik(abortCtrl.signal);
+        if (active) {
+          setData(() => freshList);
+          delayMs = 4000;
+        }
+      } catch {
+        if (abortCtrl?.signal.aborted) return;
+        delayMs = Math.min(Math.round(delayMs * 1.5), 15000);
+      } finally {
+        if (active) scheduleNext();
+      }
+    };
+
+    scheduleNext();
+
+    const handleVisibility = () => {
+      if (document.visibilityState === 'visible' && active) {
+        delayMs = 4000;
+        void pollList();
+      } else if (abortCtrl) {
+        abortCtrl.abort();
+      }
+    };
+    document.addEventListener('visibilitychange', handleVisibility);
+
+    return () => {
+      active = false;
+      if (timer) clearTimeout(timer);
+      if (abortCtrl) abortCtrl.abort();
+      document.removeEventListener('visibilitychange', handleVisibility);
+    };
+  }, [setData]);
 
   const list = useMemo(() => {
     const term = query.trim().toLowerCase();

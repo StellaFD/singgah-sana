@@ -15,7 +15,7 @@ export default function Card({
   return (
     <div
       className={`
-        bg-white rounded-2xl border border-surface-border overflow-hidden font-inter transition-all duration-200
+        bg-white rounded-card border border-surface-border overflow-hidden font-inter transition-all duration-200
         ${hoverable ? 'hover:shadow-card-hover hover:border-brand-primary/30 cursor-pointer' : ''}
         ${className}
       `}

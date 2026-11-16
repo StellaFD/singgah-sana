@@ -26,6 +26,7 @@ export default function InquiryModal({
   const [pesan, setPesan] = useState('');
   const [showNotice, setShowNotice] = useState(false);
   const [noticeMessage, setNoticeMessage] = useState('');
+  const [createdInquiryId, setCreatedInquiryId] = useState<string | null>(null);
 
   if (!kos) return null;
 
@@ -47,12 +48,17 @@ export default function InquiryModal({
     if (auth.user?.role !== 'pencari') {setNoticeMessage('Pertanyaan tersedia untuk akun pencari.');setShowNotice(true);return;}
     setSending(true);
 
+    const clientMsgId = `seeker-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`;
     const res = await sendInquiryApi({
       kos_id: kos.id || kos._id,
       pesan: pesan.trim(),
+      client_msg_id: clientMsgId,
     });
 
     setSending(false); setSent(res.success);
+    if (res.success && res.data?.inquiry_id) {
+      setCreatedInquiryId(res.data.inquiry_id);
+    }
     setNoticeMessage(
       res.message ||
         'Layanan pengiriman pesan ke pengelola saat ini belum tersedia. Pesan belum tersimpan atau terkirim.'
@@ -64,6 +70,7 @@ export default function InquiryModal({
     setShowNotice(false); setSent(false);
     setPesan('');
     setNoticeMessage('');
+    setCreatedInquiryId(null);
     onClose();
   };
 
@@ -99,7 +106,7 @@ export default function InquiryModal({
           </div>
 
           <div className="flex justify-end gap-3 pt-2">
-            <Button variant="secondary" onClick={() => sent ? router.push('/pesan') : setShowNotice(false)}>
+            <Button variant="secondary" onClick={() => sent ? router.push(createdInquiryId ? `/pesan?c=${createdInquiryId}` : '/pesan') : setShowNotice(false)}>
               {sent ? 'Lihat pesan' : 'Ubah pertanyaan'}
             </Button>
             <Button variant="primary" onClick={handleCloseAll}>
@@ -165,7 +172,7 @@ export default function InquiryModal({
 
           {/* Catatan Informasi */}
           <p className="text-[11px] text-ink-muted leading-relaxed">
-            Satu pertanyaan dapat dikirim lagi setelah pemilik membalas. Pertanyaan tidak memesan kamar.
+            Pertanyaan akan terhubung langsung ke percakapan dengan pemilik kos. Pertanyaan tidak memesan kamar.
           </p>
 
           {/* Aksi Form */}

@@ -56,7 +56,7 @@ function NavigationItems({ onNavigate, pathname }: NavigationItemsProps) {
     const className = cn(
       'flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium',
       isActive
-        ? 'bg-indigo-50 text-indigo-800'
+        ? 'bg-brand-lavender text-brand-primary'
         : item.href
         ? 'text-slate-600 hover:bg-slate-100 hover:text-slate-900'
         : 'cursor-not-allowed text-slate-400'
@@ -68,10 +68,13 @@ function NavigationItems({ onNavigate, pathname }: NavigationItemsProps) {
           aria-disabled="true"
           className={className}
           key={item.label}
-          title="Halaman ini belum dibuat"
+          title="Fitur ini sedang dalam pengembangan"
         >
           <Icon aria-hidden="true" size={18} />
           {item.label}
+          <span className="ml-auto rounded-full bg-slate-100 px-2 py-0.5 text-[10px] font-semibold text-slate-500">
+            Segera
+          </span>
         </span>
       );
     }
@@ -182,7 +185,7 @@ export default function AdminLayout({
               aria-label="Buka menu navigasi"
               aria-controls="admin-navigation-sidebar"
               aria-expanded={isMobileNavOpen}
-              className="rounded-lg p-2 text-slate-600 hover:bg-slate-100 focus:outline-none focus:ring-2 focus:ring-indigo-600 lg:hidden"
+              className="rounded-lg p-2 text-slate-600 hover:bg-slate-100 focus:outline-none focus:ring-2 focus:ring-brand-primary lg:hidden"
               onClick={() => setIsMobileNavOpen(true)}
               ref={menuButtonRef}
               type="button"
@@ -204,13 +207,13 @@ export default function AdminLayout({
             </div>
             <span
               aria-hidden="true"
-              className="flex h-9 w-9 items-center justify-center rounded-full bg-indigo-100 text-sm font-semibold text-indigo-800"
+              className="flex h-9 w-9 items-center justify-center rounded-full bg-brand-lavender text-sm font-semibold text-brand-primary"
             >
               {admin.nama?.trim().charAt(0).toUpperCase() || 'A'}
             </span>
             <button
               aria-label="Keluar dari akun admin"
-              className="inline-flex items-center gap-2 rounded-lg border border-slate-200 px-3 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50 focus:outline-none focus:ring-2 focus:ring-indigo-600"
+              className="inline-flex items-center gap-2 rounded-lg border border-slate-200 px-3 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50 focus:outline-none focus:ring-2 focus:ring-brand-primary"
               onClick={onLogout}
               type="button"
             >
@@ -221,7 +224,7 @@ export default function AdminLayout({
         </header>
 
         <a
-          className="sr-only rounded bg-white px-4 py-2 text-indigo-800 focus:not-sr-only focus:fixed focus:left-4 focus:top-4 focus:z-50 focus:ring-2 focus:ring-indigo-600"
+          className="sr-only rounded bg-white px-4 py-2 text-brand-primary focus:not-sr-only focus:fixed focus:left-4 focus:top-4 focus:z-50 focus:ring-2 focus:ring-brand-primary"
           href="#admin-main"
         >
           Lewati navigasi

@@ -30,23 +30,23 @@ const Button = React.forwardRef<HTMLButtonElement, ButtonProps>(function Button(
   ref
 ) {
   const baseStyles =
-    'inline-flex items-center justify-center font-medium font-inter transition-all duration-150 focus:outline-none focus:ring-2 focus:ring-offset-2 disabled:opacity-50 disabled:cursor-not-allowed select-none cursor-pointer';
+    'inline-flex items-center justify-center font-medium font-inter transition-all duration-150 focus:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 focus:ring-2 focus:ring-offset-2 disabled:opacity-50 disabled:cursor-not-allowed select-none cursor-pointer';
 
   const sizeStyles: Record<ButtonSize, string> = {
-    sm: 'text-xs px-3 py-1.5 rounded-lg gap-1.5',
-    md: 'text-sm px-4 py-2.5 rounded-lg gap-2',
-    lg: 'text-base px-6 py-3 rounded-lg gap-2.5',
+    sm: 'text-xs px-3 h-9 rounded-xl gap-1.5',
+    md: 'text-sm px-4 h-12 rounded-xl gap-2',
+    lg: 'text-base px-6 h-12 rounded-xl gap-2.5',
   };
 
   const variantStyles: Record<ButtonVariant, string> = {
     primary:
-      'bg-brand-primary text-white hover:bg-brand-hover active:bg-brand-hover focus:ring-brand-primary shadow-sm',
+      'bg-brand-primary text-white hover:bg-brand-hover active:bg-brand-hover focus-visible:ring-brand-primary focus:ring-brand-primary shadow-sm',
     secondary:
-      'bg-white text-ink border border-surface-border hover:bg-surface-muted active:bg-surface-border focus:ring-brand-primary',
+      'bg-white text-ink border border-surface-border hover:bg-surface-muted active:bg-surface-border focus-visible:ring-brand-primary focus:ring-brand-primary',
     ghost:
-      'bg-transparent text-ink hover:bg-surface-muted active:bg-surface-border focus:ring-brand-primary',
+      'bg-transparent text-ink hover:bg-surface-muted active:bg-surface-border focus-visible:ring-brand-primary focus:ring-brand-primary',
     danger:
-      'bg-red-600 text-white hover:bg-red-700 active:bg-red-800 focus:ring-red-500',
+      'bg-red-600 text-white hover:bg-red-700 active:bg-red-800 focus-visible:ring-red-500 focus:ring-red-500',
   };
 
   return (

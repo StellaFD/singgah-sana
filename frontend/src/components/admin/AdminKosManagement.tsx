@@ -3,6 +3,7 @@
 import { useEffect, useState, type ChangeEvent, type FormEvent } from 'react';
 import Link from 'next/link';
 import { Download, Search } from 'lucide-react';
+import Pagination from '@/components/ui/Pagination';
 import { ADMIN_KOS_PAGE_SIZE } from '../../lib/adminKos';
 import {
   getAdminKosManagement,
@@ -548,38 +549,19 @@ export default function AdminKosManagement({
       </div>
 
       {pagination && pagination.totalData > 0 && (
-        <div className="mt-4 flex flex-wrap items-center justify-between gap-3 border-t border-slate-100 pt-4">
-          <p className="text-sm text-slate-500">
-            Menampilkan {kosList.length} dari {pagination.totalData} kos
-          </p>
-          <div className="flex items-center gap-2">
-            <button
-              className="rounded-lg border border-slate-300 px-3 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-50"
-              disabled={page <= 1 || isLoading}
-              onClick={() => {
-                beginLoading();
-                setPage((current) => current - 1);
-              }}
-              type="button"
-            >
-              Sebelumnya
-            </button>
-            <span className="px-2 text-sm text-slate-600">
-              Halaman {pagination.currentPage} dari {pagination.totalPages}
-            </span>
-            <button
-              className="rounded-lg border border-slate-300 px-3 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-50"
-              disabled={page >= pagination.totalPages || isLoading}
-              onClick={() => {
-                beginLoading();
-                setPage((current) => current + 1);
-              }}
-              type="button"
-            >
-              Berikutnya
-            </button>
-          </div>
-        </div>
+        <Pagination
+          currentPage={pagination.currentPage}
+          totalPages={pagination.totalPages}
+          onPageChange={(newPage) => {
+            beginLoading();
+            setPage(newPage);
+          }}
+          totalData={pagination.totalData}
+          itemCount={kosList.length}
+          itemLabel="kos"
+          disabled={isLoading}
+          className="mt-4"
+        />
       )}
     </section>
   );

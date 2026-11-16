@@ -1,5 +1,35 @@
 const mongoose = require('mongoose');
 
+const pesanSubSchema = new mongoose.Schema(
+  {
+    pengirim_id: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: 'User',
+      required: true,
+    },
+    pengirim_role: {
+      type: String,
+      enum: ['pencari', 'pemilik'],
+      required: true,
+    },
+    teks: {
+      type: String,
+      required: [true, 'Teks pesan wajib diisi'],
+      trim: true,
+      maxlength: [1000, 'Teks pesan maksimal 1000 karakter'],
+    },
+    client_msg_id: {
+      type: String,
+      default: null,
+      trim: true,
+      maxlength: [64, 'client_msg_id maksimal 64 karakter'],
+    },
+  },
+  {
+    timestamps: true,
+  }
+);
+
 const inquirySchema = new mongoose.Schema(
   {
     pencari_id: {
@@ -32,16 +62,73 @@ const inquirySchema = new mongoose.Schema(
       trim: true,
       maxlength: [1000, 'Balasan maksimal 1000 karakter'],
     },
+    balasan_at: {
+      type: Date,
+      default: null,
+    },
+    client_msg_id: {
+      type: String,
+      default: null,
+      trim: true,
+      maxlength: [64, 'client_msg_id maksimal 64 karakter'],
+    },
     status: {
       type: String,
       enum: ['menunggu', 'dibalas'],
       default: 'menunggu',
     },
+    // Array pesan percakapan multi-turn berkelanjutan (kompatibel penuh dengan data lama)
+    pesan_list: {
+      type: [pesanSubSchema],
+      default: [],
+    },
   },
   {
     timestamps: true,
+    toJSON: { virtuals: true },
+    toObject: { virtuals: true },
   }
 );
+
+// Virtual getter untuk mendapatkan daftar percakapan lengkap secara berurutan
+inquirySchema.virtual('riwayat_pesan').get(function () {
+  const hasil = [];
+  // 1. Pesan awal dari pencari (selalu ada)
+  if (this.pesan) {
+    hasil.push({
+      _id: `${this._id}-0`,
+      pengirim_id: this.pencari_id?._id || this.pencari_id,
+      pengirim_role: 'pencari',
+      teks: this.pesan,
+      client_msg_id: this.client_msg_id || null,
+      createdAt: this.createdAt || null,
+    });
+  }
+  // 2. Balasan awal dari pemilik (jika ada pada format legacy, gunakan balasan_at stabil; jika tidak tercatat, kembalikan null tanpa mengarang waktu)
+  if (this.balasan) {
+    hasil.push({
+      _id: `${this._id}-1`,
+      pengirim_id: this.pemilik_id?._id || this.pemilik_id,
+      pengirim_role: 'pemilik',
+      teks: this.balasan,
+      createdAt: this.balasan_at || null,
+    });
+  }
+  // 3. Pesan-pesan berikutnya dari array pesan_list
+  if (Array.isArray(this.pesan_list) && this.pesan_list.length > 0) {
+    this.pesan_list.forEach((p) => {
+      hasil.push({
+        _id: p._id,
+        pengirim_id: p.pengirim_id?._id || p.pengirim_id,
+        pengirim_role: p.pengirim_role,
+        teks: p.teks,
+        client_msg_id: p.client_msg_id || null,
+        createdAt: p.createdAt || null,
+      });
+    });
+  }
+  return hasil;
+});
 
 // Satu pencari hanya boleh punya satu inquiry 'menunggu' per kos.
 // Pengecekan utama ada di controller (409); index ini menjaga dari request yang masuk bersamaan.

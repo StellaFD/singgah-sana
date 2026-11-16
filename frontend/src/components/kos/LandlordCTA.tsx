@@ -1,11 +1,57 @@
 'use client';
 
 import React, { useState } from 'react';
+import { useRouter } from 'next/navigation';
 import Button from '@/components/ui/Button';
 import Modal from '@/components/ui/Modal';
+import { useAuth } from '@/features/auth/AuthContext';
+import { safeInternalPath } from '@/lib/authRedirect';
 
 export default function LandlordCTA() {
+  const auth = useAuth();
+  const router = useRouter();
   const [modalOpen, setModalOpen] = useState(false);
+  const [isLoggingOut, setIsLoggingOut] = useState(false);
+
+  const [logoutError, setLogoutError] = useState<string | null>(null);
+
+  const targetPath = safeInternalPath('/pemilik/kos/baru') || '/pemilik';
+
+  const handleClick = () => {
+    setLogoutError(null);
+    if (!auth.isAuthenticated) {
+      router.push('/daftar?role=pemilik&next=' + encodeURIComponent(targetPath));
+      return;
+    }
+
+    if (auth.user?.role === 'pemilik') {
+      router.push(targetPath);
+      return;
+    }
+
+    // Peran aktif bukan pemilik (pencari atau admin)
+    setModalOpen(true);
+  };
+
+  const handleSwitchToOwnerLogin = async () => {
+    setIsLoggingOut(true);
+    setLogoutError(null);
+    try {
+      // Keluar dari sesi peran saat ini secara eksplisit terlebih dahulu agar tidak terhalang GuestOnly
+      await auth.logout();
+      setIsLoggingOut(false);
+      setModalOpen(false);
+      router.push('/masuk?role=pemilik&next=' + encodeURIComponent(targetPath));
+    } catch (err: unknown) {
+      setIsLoggingOut(false);
+      // Jangan menelan kegagalan logout! Tampilkan error ke pengguna dan batalkan navigasi
+      const msg = err instanceof Error ? err.message : 'Gagal keluar dari akun saat ini. Silakan coba lagi.';
+      setLogoutError(msg);
+    }
+  };
+
+  const currentRoleLabel =
+    auth.user?.role === 'admin' ? 'Administrator' : 'Pencari Kos';
 
   return (
     <>
@@ -20,26 +66,47 @@ export default function LandlordCTA() {
           variant="primary"
           size="md"
           className="h-12 w-60 font-medium text-base"
-          onClick={() => setModalOpen(true)}
+          onClick={handleClick}
         >
           Mulai daftarkan kos
         </Button>
       </section>
 
-      {/* Honest Landlord Module Modal */}
+      {/* Modal Pemisahan Peran Tunggal dengan Konfirmasi Logout Eksplisit */}
       <Modal
         isOpen={modalOpen}
         onClose={() => setModalOpen(false)}
-        title="Pendaftaran Properti Pemilik Kos"
-        description="Informasi Pendaftaran Pemilik Kos"
+        title="Ganti ke Akun Pemilik Kos"
+        description="Pemberitahuan Peran Akun"
       >
         <div className="space-y-4">
-          <p className="text-sm text-ink-muted leading-relaxed">
-            Portal pemilik kos untuk pendaftaran listing properti mandiri dan verifikasi dokumen legalitas saat ini sedang dalam tahap persiapan integrasi backend (tahap P2). Pilihan belum dapat diproses secara langsung melalui antarmuka web.
+          <p className="text-sm text-ink leading-relaxed">
+            Akun Anda saat ini tercatat sebagai <strong>{currentRoleLabel}</strong>. Sistem Singgah Sana menerapkan prinsip satu akun untuk satu peran demi menjaga keamanan data dan hak akses Anda.
           </p>
-          <div className="flex justify-end pt-2">
-            <Button variant="primary" size="sm" onClick={() => setModalOpen(false)}>
-              Mengerti
+          <p className="text-sm text-ink-muted leading-relaxed">
+            Untuk mengelola atau mendaftarkan kos baru, Anda perlu keluar dari akun {currentRoleLabel} ini terlebih dahulu, lalu masuk menggunakan akun pemilik kos.
+          </p>
+          {logoutError && (
+            <p className="text-xs text-red-600 bg-red-50 p-2.5 rounded-lg border border-red-200" role="alert">
+              {logoutError}
+            </p>
+          )}
+          <div className="flex justify-end gap-2 pt-2">
+            <Button
+              variant="secondary"
+              size="sm"
+              disabled={isLoggingOut}
+              onClick={() => setModalOpen(false)}
+            >
+              Batal
+            </Button>
+            <Button
+              variant="primary"
+              size="sm"
+              loading={isLoggingOut}
+              onClick={handleSwitchToOwnerLogin}
+            >
+              Keluar & Masuk Akun Pemilik
             </Button>
           </div>
         </div>

@@ -32,6 +32,11 @@ const Select = React.forwardRef<HTMLSelectElement, SelectProps>(function Select(
   ref
 ) {
   const selectId = id || (label ? label.toLowerCase().replace(/\s+/g, '-') : undefined);
+  const describedBy = error
+    ? selectId ? `${selectId}-error` : undefined
+    : helperText
+    ? selectId ? `${selectId}-helper` : undefined
+    : undefined;
 
   return (
     <div className="w-full font-inter">
@@ -47,14 +52,18 @@ const Select = React.forwardRef<HTMLSelectElement, SelectProps>(function Select(
         <select
           ref={ref}
           id={selectId}
+          required={required}
           value={value}
           onChange={onChange}
           disabled={disabled}
+          aria-invalid={error ? true : undefined}
+          aria-describedby={describedBy}
           className={`
-            block w-full appearance-none rounded-lg border bg-white px-3.5 py-2.5 pr-10 text-sm text-ink
+            block w-full h-12 appearance-none rounded-xl border bg-white px-3.5 pr-10 text-sm text-ink
             transition-colors duration-150 focus:outline-none focus:ring-2 focus:ring-brand-primary focus:border-brand-primary
+            focus-visible:ring-2 focus-visible:ring-brand-primary focus-visible:border-brand-primary
             disabled:bg-surface-muted disabled:text-ink-muted disabled:cursor-not-allowed
-            ${error ? 'border-red-500 focus:ring-red-500 focus:border-red-500' : 'border-surface-border'}
+            ${error ? 'border-red-500 focus:ring-red-500 focus:border-red-500 focus-visible:ring-red-500' : 'border-surface-border'}
             ${className}
           `}
           {...props}
@@ -75,12 +84,12 @@ const Select = React.forwardRef<HTMLSelectElement, SelectProps>(function Select(
         </div>
       </div>
       {error && (
-        <p className="mt-1.5 text-xs text-red-600 font-medium" role="alert">
+        <p id={selectId ? `${selectId}-error` : undefined} className="mt-1.5 text-xs text-red-600 font-medium" role="alert">
           {error}
         </p>
       )}
       {!error && helperText && (
-        <p className="mt-1.5 text-xs text-ink-muted">{helperText}</p>
+        <p id={selectId ? `${selectId}-helper` : undefined} className="mt-1.5 text-xs text-ink-muted">{helperText}</p>
       )}
     </div>
   );

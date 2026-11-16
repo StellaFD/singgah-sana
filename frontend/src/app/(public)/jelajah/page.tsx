@@ -2,8 +2,9 @@
 
 import React, { useState, useEffect, useMemo, useCallback, Suspense, useRef } from 'react';
 import { useRouter, useSearchParams, usePathname } from 'next/navigation';
-import { Search, SlidersHorizontal, Map, Grid, ChevronLeft, ChevronRight } from 'lucide-react';
+import { Search, SlidersHorizontal, Map, Grid } from 'lucide-react';
 import Button from '@/components/ui/Button';
+import Pagination from '@/components/ui/Pagination';
 import KosGrid from '@/components/kos/KosGrid';
 import ResultMap from '@/components/kos/ResultMap';
 import FilterModal from '@/components/kos/FilterModal';
@@ -390,29 +391,16 @@ function JelajahContent() {
 
         {/* Paginasi (khusus mode daftar) */}
         {!showMap && totalPages > 1 && (
-          <div className="flex items-center justify-center gap-2 pt-8 border-t border-surface-border">
-            <Button
-              variant="secondary"
-              size="sm"
-              disabled={currentPage <= 1 || loading}
-              onClick={() => updateQuery({ page: currentPage - 1 }, false)}
-              leftIcon={<ChevronLeft className="w-4 h-4" />}
-            >
-              Sebelumnya
-            </Button>
-            <span className="text-xs text-ink-muted px-3">
-              Halaman {currentPage} dari {totalPages}
-            </span>
-            <Button
-              variant="secondary"
-              size="sm"
-              disabled={currentPage >= totalPages || loading}
-              onClick={() => updateQuery({ page: currentPage + 1 }, false)}
-              rightIcon={<ChevronRight className="w-4 h-4" />}
-            >
-              Berikutnya
-            </Button>
-          </div>
+          <Pagination
+            currentPage={currentPage}
+            totalPages={totalPages}
+            onPageChange={(p) => updateQuery({ page: p }, false)}
+            totalData={totalCount}
+            itemCount={kosList.length}
+            itemLabel="kos"
+            disabled={loading}
+            className="pt-8"
+          />
         )}
       </div>
 

@@ -1,7 +1,9 @@
+import { useEffect, useRef, useState } from 'react';
 import { Mail, Phone } from 'lucide-react';
 import { Badge } from '@/components/owner-ui/badge';
 import { formatDate, formatRelativeShort } from '@/lib/owner/format';
-import type { OwnerInquiry } from '../types';
+import type { OwnerInquiry, OwnerInquiryDetail, ChatMessage } from '../types';
+import { getInquiryDetail } from '../api';
 import { ReplyForm } from './reply-form';
 
 type InquiryThreadProps = {
@@ -11,13 +13,149 @@ type InquiryThreadProps = {
 
 export function InquiryThread({ inquiry, onReplied }: InquiryThreadProps) {
   const pencari = inquiry.pencari_id;
+  const [detail, setDetail] = useState<OwnerInquiryDetail | null>(null);
+  const oldestCursorRef = useRef<string | null>(null);
+  const [loadingOlder, setLoadingOlder] = useState(false);
+
+  const loadOlderMessages = async () => {
+    const cursor = oldestCursorRef.current;
+    if (!cursor || loadingOlder) return;
+    setLoadingOlder(true);
+    try {
+      const older = await getInquiryDetail(inquiry._id, undefined, cursor);
+      oldestCursorRef.current = older.pagination?.oldest_cursor ?? null;
+      setDetail((prev) => {
+        if (!prev) return older;
+        const currentIds = new Set(prev.riwayat_pesan.map((m) => m._id));
+        const newOlder = older.riwayat_pesan.filter((m) => !currentIds.has(m._id));
+        return {
+          ...prev,
+          riwayat_pesan: [...newOlder, ...prev.riwayat_pesan],
+          pagination: older.pagination
+            ? {
+                ...older.pagination,
+                has_more: !!older.pagination.has_more,
+                oldest_cursor: oldestCursorRef.current,
+              }
+            : undefined,
+        };
+      });
+    } catch {
+      // Biarkan tombol aktif kembali untuk dicoba ulang
+    } finally {
+      setLoadingOlder(false);
+    }
+  };
+
+  // Muat riwayat obrolan lengkap dan polling saat tab aktif dengan dynamic chained timeout & AbortController
+  useEffect(() => {
+    let timer: NodeJS.Timeout | null = null;
+    let active = true;
+    let abortCtrl: AbortController | null = null;
+    let delayMs = 3500;
+
+    const scheduleNext = () => {
+      if (!active) return;
+      if (timer) clearTimeout(timer);
+      timer = setTimeout(executePoll, delayMs);
+    };
+
+    const executePoll = async () => {
+      if (!active || document.visibilityState !== 'visible') {
+        scheduleNext();
+        return;
+      }
+
+      if (abortCtrl) abortCtrl.abort();
+      abortCtrl = new AbortController();
+
+      try {
+        const res = await getInquiryDetail(inquiry._id, abortCtrl.signal);
+        if (active) {
+          setDetail((prev) => {
+            if (!prev) {
+              oldestCursorRef.current = res.pagination?.oldest_cursor ?? null;
+              return res;
+            }
+            // Merge pesan: pertahankan pesan lama yang sudah dimuat sebelumnya
+            const newIds = new Set(res.riwayat_pesan.map((m) => m._id));
+            const olderLoaded = prev.riwayat_pesan.filter((m) => !newIds.has(m._id));
+            return {
+              ...res,
+              riwayat_pesan: [...olderLoaded, ...res.riwayat_pesan],
+              pagination: res.pagination
+                ? {
+                    ...res.pagination,
+                    has_more: prev.pagination?.has_more ?? res.pagination.has_more,
+                    oldest_cursor: oldestCursorRef.current ?? res.pagination.oldest_cursor ?? null,
+                  }
+                : prev.pagination,
+            };
+          });
+          delayMs = 3500; // Reset ke normal saat berhasil
+        }
+      } catch {
+        if (abortCtrl?.signal.aborted) return;
+        // Exponential backoff saat gagal (3.5s -> 5.25s -> max 15s)
+        delayMs = Math.min(Math.round(delayMs * 1.5), 15000);
+      } finally {
+        if (active) scheduleNext();
+      }
+    };
+
+    // Eksekusi awal
+    void executePoll();
+
+    const handleVisibility = () => {
+      if (document.visibilityState === 'visible' && active) {
+        delayMs = 3500;
+        void executePoll();
+      } else if (abortCtrl) {
+        abortCtrl.abort();
+      }
+    };
+    document.addEventListener('visibilitychange', handleVisibility);
+
+    return () => {
+      active = false;
+      if (timer) clearTimeout(timer);
+      if (abortCtrl) abortCtrl.abort();
+      document.removeEventListener('visibilitychange', handleVisibility);
+    };
+  }, [inquiry._id, inquiry.updatedAt]);
+
+  // Bangun daftar pesan berurutan: jika ada detail riwayat_pesan gunakan itu, jika belum fallback ke format legacy
+  const messages: ChatMessage[] = detail?.riwayat_pesan?.length
+    ? detail.riwayat_pesan
+    : [
+        {
+          _id: `${inquiry._id}-0`,
+          pengirim_id: inquiry.pencari_id?._id || '',
+          pengirim_role: 'pencari',
+          teks: inquiry.pesan,
+          createdAt: inquiry.createdAt,
+        },
+        ...(inquiry.balasan
+          ? [
+              {
+                _id: `${inquiry._id}-1`,
+                pengirim_id: inquiry.pemilik_id,
+                pengirim_role: 'pemilik' as const,
+                teks: inquiry.balasan,
+                createdAt: inquiry.updatedAt,
+              },
+            ]
+          : []),
+        ...(inquiry.pesan_list || []),
+      ];
+
   return (
     <div className="flex flex-col gap-5">
       <div className="border-b border-line pb-4">
         <div className="flex flex-wrap items-center gap-3">
           <h2 className="text-lg font-semibold">{pencari?.nama ?? 'Calon penghuni'}</h2>
           <Badge tone={inquiry.status === 'menunggu' ? 'warning' : 'success'}>
-            {inquiry.status === 'menunggu' ? 'Belum dibalas' : 'Dibalas'}
+            {inquiry.status === 'menunggu' ? 'Belum dibalas' : 'Aktif'}
           </Badge>
         </div>
         <p className="mt-1 text-sm text-ink-muted">{inquiry.kos_id.nama}</p>
@@ -40,21 +178,36 @@ export function InquiryThread({ inquiry, onReplied }: InquiryThreadProps) {
       </div>
 
       <div className="flex flex-col gap-3">
-        <div className="max-w-[90%] rounded-2xl bg-canvas px-4 py-3">
-          <p className="whitespace-pre-line text-[15px]">{inquiry.pesan}</p>
-          <p className="mt-2 text-xs text-ink-muted">
-            {formatDate(inquiry.createdAt)} · {formatRelativeShort(inquiry.createdAt)}
-          </p>
-        </div>
-        {inquiry.status === 'dibalas' ? (
-          <div className="ml-auto max-w-[90%] rounded-2xl bg-brand-soft px-4 py-3">
-            <p className="whitespace-pre-line text-[15px]">{inquiry.balasan}</p>
-            <p className="mt-2 text-xs text-ink-muted">Terkirim · {formatRelativeShort(inquiry.updatedAt)}</p>
+        {detail?.pagination?.has_more && (
+          <div className="flex justify-center py-1">
+            <button
+              type="button"
+              disabled={loadingOlder}
+              onClick={loadOlderMessages}
+              className="text-xs font-medium text-brand hover:underline disabled:opacity-50"
+            >
+              {loadingOlder ? 'Memuat pesan sebelumnya…' : 'Muat pesan sebelumnya'}
+            </button>
           </div>
-        ) : null}
+        )}
+        {messages.map((m) => {
+          const isMe = m.pengirim_role === 'pemilik';
+          return (
+            <div
+              key={m._id}
+              className={isMe ? 'ml-auto max-w-[90%] rounded-2xl bg-brand-soft px-4 py-3' : 'max-w-[90%] rounded-2xl bg-canvas px-4 py-3'}
+            >
+              <p className="whitespace-pre-line text-[15px]">{m.teks}</p>
+              <p className="mt-2 text-xs text-ink-muted">
+                {isMe ? 'Anda' : pencari?.nama ?? 'Calon penghuni'}
+                {m.createdAt ? ` · ${formatDate(m.createdAt)} · ${formatRelativeShort(m.createdAt)}` : ' · Waktu tidak tercatat'}
+              </p>
+            </div>
+          );
+        })}
       </div>
 
-      {inquiry.status === 'menunggu' ? <ReplyForm inquiry={inquiry} onReplied={onReplied} /> : null}
+      <ReplyForm inquiry={inquiry} onReplied={onReplied} />
     </div>
   );
 }

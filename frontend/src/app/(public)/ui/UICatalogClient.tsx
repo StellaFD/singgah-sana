@@ -10,8 +10,21 @@ import Toggle from '@/components/ui/Toggle';
 import Chip from '@/components/ui/Chip';
 import Skeleton from '@/components/ui/Skeleton';
 import EmptyState from '@/components/ui/EmptyState';
+import ErrorState from '@/components/ui/ErrorState';
 import Modal from '@/components/ui/Modal';
+import ConfirmDialog from '@/components/ui/ConfirmDialog';
 import Toast from '@/components/ui/Toast';
+import Textarea from '@/components/ui/Textarea';
+import Pagination from '@/components/ui/Pagination';
+import {
+  TableContainer,
+  Table,
+  TableHead,
+  TableBody,
+  TableRow,
+  TableHeaderCell,
+  TableCell,
+} from '@/components/ui/Table';
 import BrandLogo from '@/components/brand/BrandLogo';
 import { useAuth } from '@/features/auth/AuthContext';
 import { Search, Heart } from 'lucide-react';
@@ -19,10 +32,12 @@ import { Search, Heart } from 'lucide-react';
 export default function UICatalogClient() {
   const { status, user, isAuthenticated, isUnavailable } = useAuth();
   const [modalOpen, setModalOpen] = useState(false);
+  const [confirmOpen, setConfirmOpen] = useState(false);
   const [toastOpen, setToastOpen] = useState(false);
   const [toggleState, setToggleState] = useState(true);
   const [checkboxState, setCheckboxState] = useState(true);
   const [activeChip, setActiveChip] = useState('putra');
+  const [catalogPage, setCatalogPage] = useState(1);
 
   return (
     <div className="max-w-7xl mx-auto w-full px-4 sm:px-6 lg:px-8 py-12 font-inter bg-white space-y-16">
@@ -199,6 +214,13 @@ export default function UICatalogClient() {
               onChange={setToggleState}
             />
           </div>
+          <div className="md:col-span-2">
+            <Textarea
+              label="Catatan Pengajuan / Deskripsi Kos"
+              placeholder="Tuliskan catatan tambahan mengenai properti atau revisi..."
+              helperText="Maksimal 500 karakter untuk kejelasan informasi."
+            />
+          </div>
         </div>
       </section>
 
@@ -245,6 +267,9 @@ export default function UICatalogClient() {
             <Button variant="secondary" onClick={() => setModalOpen(true)}>
               Buka Modal Dialog
             </Button>
+            <Button variant="secondary" onClick={() => setConfirmOpen(true)}>
+              Buka Konfirmasi Tindakan
+            </Button>
             <Button variant="secondary" onClick={() => setToastOpen(true)}>
               Tampilkan Toast Notifikasi
             </Button>
@@ -260,12 +285,75 @@ export default function UICatalogClient() {
           </div>
 
           <div>
+            <span className="text-xs text-ink-muted block font-medium mb-3">Contoh Error State:</span>
+            <ErrorState
+              title="Gagal Memuat Antrean Moderasi"
+              message="Terjadi gangguan koneksi ke layanan backend. Silakan periksa jaringan Anda."
+              onRetry={() => setToastOpen(true)}
+            />
+          </div>
+
+          <div>
             <span className="text-xs text-ink-muted block font-medium mb-3">Contoh Empty State:</span>
             <EmptyState
               title="Tidak Ditemukan Kos"
               description="Silakan coba ubah kriteria pencarian atau reset filter."
             />
           </div>
+        </div>
+      </section>
+
+      {/* 9. Tabel & Paginasi Bersama */}
+      <section className="space-y-6">
+        <div>
+          <h2 className="font-sora font-semibold text-xl text-ink">8. Tabel Data &amp; Paginasi Responsif</h2>
+          <p className="text-xs text-ink-muted mt-1">
+            Komponen tabel bersama dengan overflow kontainer aman untuk perangkat mobile dan kontrol paginasi aksesibel.
+          </p>
+        </div>
+
+        <div className="p-6 bg-surface-subtle rounded-2xl border border-surface-border space-y-4">
+          <TableContainer>
+            <Table>
+              <TableHead>
+                <TableRow>
+                  <TableHeaderCell>Nama Properti</TableHeaderCell>
+                  <TableHeaderCell>Area Kampus</TableHeaderCell>
+                  <TableHeaderCell>Status</TableHeaderCell>
+                  <TableHeaderCell>Ketersediaan</TableHeaderCell>
+                </TableRow>
+              </TableHead>
+              <TableBody>
+                <TableRow>
+                  <TableCell className="font-semibold text-ink">Kos Pogung Sejahtera</TableCell>
+                  <TableCell className="text-ink-muted">UGM Pogung</TableCell>
+                  <TableCell><Badge variant="approved">Approved</Badge></TableCell>
+                  <TableCell><Badge variant="quota">Tersedia 3 kamar</Badge></TableCell>
+                </TableRow>
+                <TableRow>
+                  <TableCell className="font-semibold text-ink">Wisma Sekip Asri</TableCell>
+                  <TableCell className="text-ink-muted">UGM Sekip</TableCell>
+                  <TableCell><Badge variant="pending">Pending</Badge></TableCell>
+                  <TableCell><Badge variant="quotaFull">Penuh</Badge></TableCell>
+                </TableRow>
+                <TableRow>
+                  <TableCell className="font-semibold text-ink">Griya Kaliurang Putri</TableCell>
+                  <TableCell className="text-ink-muted">UGM Kaliurang</TableCell>
+                  <TableCell><Badge variant="rejected">Ditolak</Badge></TableCell>
+                  <TableCell className="text-ink-muted">-</TableCell>
+                </TableRow>
+              </TableBody>
+            </Table>
+          </TableContainer>
+
+          <Pagination
+            currentPage={catalogPage}
+            totalPages={5}
+            onPageChange={setCatalogPage}
+            totalData={15}
+            itemCount={3}
+            itemLabel="listing"
+          />
         </div>
       </section>
 
@@ -287,6 +375,21 @@ export default function UICatalogClient() {
           </div>
         </div>
       </Modal>
+
+      {/* Dialog Konfirmasi Tindakan */}
+      <ConfirmDialog
+        isOpen={confirmOpen}
+        onClose={() => setConfirmOpen(false)}
+        onConfirm={() => {
+          setConfirmOpen(false);
+          setToastOpen(true);
+        }}
+        title="Konfirmasi Penghapusan Draft"
+        description="Apakah Anda yakin ingin membatalkan dan menghapus draft perubahan ini? Tindakan ini tidak dapat dibatalkan."
+        confirmLabel="Hapus Draft"
+        cancelLabel="Batal"
+        tone="danger"
+      />
 
       {/* Toast Notification */}
       <Toast
