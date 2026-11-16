@@ -13,9 +13,12 @@ export default function LandlordCTA() {
   const [modalOpen, setModalOpen] = useState(false);
   const [isLoggingOut, setIsLoggingOut] = useState(false);
 
+  const [logoutError, setLogoutError] = useState<string | null>(null);
+
   const targetPath = safeInternalPath('/pemilik/kos/baru') || '/pemilik';
 
   const handleClick = () => {
+    setLogoutError(null);
     if (!auth.isAuthenticated) {
       router.push('/daftar?role=pemilik&next=' + encodeURIComponent(targetPath));
       return;
@@ -32,15 +35,18 @@ export default function LandlordCTA() {
 
   const handleSwitchToOwnerLogin = async () => {
     setIsLoggingOut(true);
+    setLogoutError(null);
     try {
       // Keluar dari sesi peran saat ini secara eksplisit terlebih dahulu agar tidak terhalang GuestOnly
       await auth.logout();
-    } catch {
-      // Abaikan jika sudah keluar
-    } finally {
       setIsLoggingOut(false);
       setModalOpen(false);
       router.push('/masuk?role=pemilik&next=' + encodeURIComponent(targetPath));
+    } catch (err: unknown) {
+      setIsLoggingOut(false);
+      // Jangan menelan kegagalan logout! Tampilkan error ke pengguna dan batalkan navigasi
+      const msg = err instanceof Error ? err.message : 'Gagal keluar dari akun saat ini. Silakan coba lagi.';
+      setLogoutError(msg);
     }
   };
 
@@ -80,6 +86,11 @@ export default function LandlordCTA() {
           <p className="text-sm text-ink-muted leading-relaxed">
             Untuk mengelola atau mendaftarkan kos baru, Anda perlu keluar dari akun {currentRoleLabel} ini terlebih dahulu, lalu masuk menggunakan akun pemilik kos.
           </p>
+          {logoutError && (
+            <p className="text-xs text-red-600 bg-red-50 p-2.5 rounded-lg border border-red-200" role="alert">
+              {logoutError}
+            </p>
+          )}
           <div className="flex justify-end gap-2 pt-2">
             <Button
               variant="secondary"

@@ -2,15 +2,47 @@ export type UserRole = 'pencari' | 'pemilik' | 'admin';
 export type AuthRoleContext = 'pencari' | 'pemilik' | 'admin';
 
 /**
- * Memeriksa apakah path merupakan jalur internal yang aman (bukan protocol-relative // atau backslash \).
+ * Memeriksa dan menormalisasi jalur internal agar aman:
+ * - Menolak protocol-relative (//) dan backslash (\).
+ * - Menangani URL-encoding (misal %2e%2e, %2f).
+ * - Menormalisasi dot-segments (/../, /./) sehingga traversal tidak dapat meloloskan rute terlarang.
  */
 export function safeInternalPath(value: string | null | undefined): string | null {
   if (!value) return null;
-  const trimmed = value.trim();
-  if (trimmed.startsWith('/') && !trimmed.startsWith('//') && !trimmed.includes('\\')) {
-    return trimmed;
+  let trimmed = value.trim();
+
+  // Tolak backslash dan protocol-relative
+  if (!trimmed.startsWith('/') || trimmed.startsWith('//') || trimmed.includes('\\')) {
+    return null;
   }
-  return null;
+
+  // Coba decode URI component untuk mendeteksi encoded dot-segments (%2e%2e, dsb.)
+  let decoded = trimmed;
+  try {
+    decoded = decodeURIComponent(trimmed);
+  } catch {
+    return null;
+  }
+
+  if (decoded.includes('\\') || decoded.startsWith('//')) {
+    return null;
+  }
+
+  // Normalisasi dot-segments menggunakan dummy base origin
+  try {
+    const parsed = new URL(decoded, 'http://localhost');
+    // Jika pathname hasil parsing memiliki traversal keluar atau manipulasi aneh
+    const normalizedPathname = parsed.pathname;
+    if (normalizedPathname.includes('/../') || normalizedPathname.endsWith('/..')) {
+      return null;
+    }
+    // Gabungkan kembali pathname normal dengan query string dan hash asli yang aman
+    const search = parsed.search || '';
+    const hash = parsed.hash || '';
+    return `${normalizedPathname}${search}${hash}`;
+  } catch {
+    return null;
+  }
 }
 
 /**
