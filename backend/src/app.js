@@ -8,6 +8,8 @@ const kosRoutes = require('./routes/kosRoutes');
 const adminRoutes = require('./routes/adminRoutes');
 const favoritRoutes = require('./routes/favoritRoutes');
 const inquiryRoutes = require('./routes/inquiryRoutes');
+const pemilikKosRoutes = require('./routes/pemilikKosRoutes');
+const mediaRoutes = require('./routes/mediaRoutes');
 const { notFound, errorHandler } = require('./middlewares/errorMiddleware');
 const { loadSession, validateCsrf } = require('./middlewares/sessionMiddleware');
 
@@ -40,6 +42,8 @@ app.get('/api', (req, res) => {
 // Mounting Rute API
 app.use('/api/auth', authRoutes);
 app.use('/api/kos', kosRoutes);
+app.use('/api/pemilik/kos', pemilikKosRoutes);
+app.use('/api/media', mediaRoutes);
 app.use('/api/admin', adminRoutes);
 app.use('/api/favorit', favoritRoutes);
 app.use('/api/inquiries', inquiryRoutes);

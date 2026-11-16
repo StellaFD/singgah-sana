@@ -5,6 +5,7 @@ const request = require('supertest');
 const app = require('../src/app');
 const User = require('../src/models/User');
 const Kos = require('../src/models/Kos');
+const MediaAsset = require('../src/models/MediaAsset');
 
 const DEFAULT_PASSWORD = 'Password123!';
 let counter = 0;
@@ -12,8 +13,6 @@ let counter = 0;
 /**
  * Membuat user langsung lewat model (supaya role 'admin' juga bisa dibuat),
  * lalu login lewat API untuk mendapatkan token asli.
- * Login lewat API (bukan jwt.sign manual) supaya helper ini tidak rusak
- * ketika cara pembuatan token diubah (task S2).
  *
  * @param {'admin'|'pemilik'|'pencari'} role
  * @param {object} overrides field User lain yang ingin diganti
@@ -67,7 +66,42 @@ const createKos = async (owner, overrides = {}) => {
   });
 };
 
+/**
+ * Membuat MediaAsset langsung lewat model untuk kemudahan pengujian.
+ */
+const createMediaAsset = async (user, overrides = {}) => {
+  counter += 1;
+  return MediaAsset.create({
+    user_id: user._id,
+    file_path: `/tmp/test-image-${counter}.png`,
+    url: `/uploads/test-image-${counter}.png`,
+    alt: `Foto Uji ${counter}`,
+    original_filename: `test-image-${counter}.png`,
+    mime_type: 'image/png',
+    file_size: 1024,
+    ...overrides,
+  });
+};
+
+const samplePngBuffer = Buffer.from([
+  0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a, 0x00, 0x00, 0x00, 0x0d, 0x49, 0x48, 0x44, 0x52,
+]);
+
+const sampleJpgBuffer = Buffer.from([
+  0xff, 0xd8, 0xff, 0xe0, 0x00, 0x10, 0x4a, 0x46, 0x49, 0x46, 0x00, 0x01,
+]);
+
 /** Header Authorization siap pakai: .set(auth(token)) */
 const auth = (token) => ({ Authorization: `Bearer ${token}` });
 
-module.exports = { app, request, createUser, createKos, auth, DEFAULT_PASSWORD };
+module.exports = {
+  app,
+  request,
+  createUser,
+  createKos,
+  createMediaAsset,
+  samplePngBuffer,
+  sampleJpgBuffer,
+  auth,
+  DEFAULT_PASSWORD,
+};

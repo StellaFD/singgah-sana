@@ -1,4 +1,4 @@
-const { app, request, createUser, createKos, auth, DEFAULT_PASSWORD } = require('./helpers');
+const { app, request, createUser, createKos, createMediaAsset, auth, DEFAULT_PASSWORD } = require('./helpers');
 const Session = require('../src/models/Session');
 const User = require('../src/models/User');
 const ORIGIN = 'http://localhost:3000';
@@ -142,11 +142,37 @@ describe('Server sessions shared by all roles', () => {
 
   it('allows only one admin decision and requires a rejection reason', async () => {
     const owner = await createUser('pemilik'), admin = await createUser('admin');
-    const kos = await createKos(owner.user, { status_verifikasi: 'pending' });
-    const url = `/api/admin/kos/${kos._id}/verifikasi`;
-    expect((await request(app).patch(url).set(auth(admin.token)).send({ status_verifikasi: 'rejected' })).status).toBe(422);
+    const asset = await createMediaAsset(owner.user);
+    const resDraft = await request(app).post('/api/pemilik/kos').set(auth(owner.token)).send({
+      nama: 'Kos Uji Keputusan',
+      deskripsi: 'Deskripsi lengkap kos untuk pengujian keputusan',
+      alamat: 'Jl. Uji',
+      area_kampus: 'UGM',
+      koordinat: { latitude: -7.76, longitude: 110.37 },
+      harga_per_bulan: 1000000,
+      tipe: 'campur',
+      jumlah_kamar_total: 5,
+      jumlah_kamar_tersedia: 5,
+      foto_ids: [String(asset._id)],
+    });
+    expect(resDraft.status).toBe(201);
+    const kosId = resDraft.body.data._id;
+    const resSubmit = await request(app).post(`/api/pemilik/kos/${kosId}/ajukan`).set(auth(owner.token)).send({ expected_version: 1 });
+    expect(resSubmit.status).toBe(200);
+    const subId = resSubmit.body.data._id;
+    const subVersion = resSubmit.body.data.version;
+
+    // Route legacy tanpa expected_version ditolak 409
+    const legacyUrl = `/api/admin/kos/${kosId}/verifikasi`;
+    expect((await request(app).patch(legacyUrl).set(auth(admin.token)).send({ status_verifikasi: 'approved' })).status).toBe(409);
+
+    // Canonical route memerlukan catatan_verifikasi saat rejected
+    const url = `/api/admin/pengajuan/${subId}/keputusan`;
+    expect((await request(app).patch(url).set(auth(admin.token)).send({ keputusan: 'rejected', expected_version: subVersion })).status).toBe(422);
+
+    // Race decision canonical: hanya satu yang menang 200, yang lain 409
     const decisions = await Promise.all(['approved', 'rejected'].map(status => request(app).patch(url).set(auth(admin.token))
-      .send({ status_verifikasi: status, catatan_verifikasi: 'Alasan pengujian' })));
+      .send({ keputusan: status, catatan_verifikasi: 'Alasan pengujian', expected_version: subVersion })));
     expect(decisions.map(item => item.status).sort()).toEqual([200, 409]);
   });
 });

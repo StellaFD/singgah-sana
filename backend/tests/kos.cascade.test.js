@@ -28,11 +28,19 @@ afterEach(() => {
 const hapusKos = (token, id) => request(app).delete(`/api/kos/${id}`).set(auth(token));
 
 describe('DELETE /api/kos/:id (hapus berantai)', () => {
-  it('menghapus favorit dan inquiry milik kos tersebut saja', async () => {
+  it('soft delete kanonikal: arsipkan listing approved lalu hapus dengan expected_version; listing hilang dari publik sementara favorit dan inquiry tetap ada', async () => {
     const { user: pemilik, token: tokenPemilik } = await createUser('pemilik');
     const { user: pencari } = await createUser('pencari');
-    const kosDihapus = await createKos(pemilik);
-    const kosLain = await createKos(pemilik);
+    const kosDihapus = await createKos(pemilik, {
+      status_verifikasi: 'approved',
+      status_publikasi: 'active',
+      version: 1,
+    });
+    const kosLain = await createKos(pemilik, {
+      status_verifikasi: 'approved',
+      status_publikasi: 'active',
+      version: 1,
+    });
 
     for (const kos of [kosDihapus, kosLain]) {
       await Favorit.create({ user_id: pencari._id, kos_id: kos._id });
@@ -44,46 +52,104 @@ describe('DELETE /api/kos/:id (hapus berantai)', () => {
       });
     }
 
-    const res = await hapusKos(tokenPemilik, kosDihapus._id);
+    // 1. Uji rute legacy ditolak 409 DEPRECATED_ENDPOINT tanpa menghapus data apapun
+    const resLegacy = await hapusKos(tokenPemilik, kosDihapus._id);
+    expect(resLegacy.statusCode).toBe(409);
+    expect(resLegacy.body.code).toBe('DEPRECATED_ENDPOINT');
+    expect(await Kos.findById(kosDihapus._id)).not.toBeNull();
 
-    expect(res.statusCode).toBe(200);
-    expect(await Kos.findById(kosDihapus._id)).toBeNull();
-    expect(await Favorit.countDocuments({ kos_id: kosDihapus._id })).toBe(0);
-    expect(await Inquiry.countDocuments({ kos_id: kosDihapus._id })).toBe(0);
+    // 2. Listing approved harus diarsipkan dahulu sebelum soft delete
+    const resDeleteUnarchived = await request(app)
+      .delete(`/api/pemilik/kos/${kosDihapus._id}`)
+      .set(auth(tokenPemilik))
+      .send({ expected_version: 1 });
+    expect(resDeleteUnarchived.statusCode).toBe(409);
+
+    // Arsipkan kos
+    const resArchive = await request(app)
+      .patch(`/api/pemilik/kos/${kosDihapus._id}/publikasi`)
+      .set(auth(tokenPemilik))
+      .send({ status_publikasi: 'archived', expected_version: 1 });
+    expect(resArchive.statusCode).toBe(200);
+    expect(resArchive.body.success).toBe(true);
+    const versionAfterArchive = resArchive.body.data.version;
+
+    // 3. Soft delete kanonikal dengan expected_version
+    const resCanonical = await request(app)
+      .delete(`/api/pemilik/kos/${kosDihapus._id}`)
+      .set(auth(tokenPemilik))
+      .send({ expected_version: versionAfterArchive });
+    expect(resCanonical.statusCode).toBe(200);
+
+    // Listing berstatus deleted_at (soft delete), tidak hilang secara hard-delete
+    const kosDb = await Kos.findById(kosDihapus._id);
+    expect(kosDb).not.toBeNull();
+    expect(kosDb.deleted_at).not.toBeNull();
+
+    // Listing tidak tampil pada pencarian publik
+    const resPublik = await request(app).get(`/api/kos/${kosDihapus._id}`);
+    expect(resPublik.statusCode).toBe(404);
+
+    // Favorit dan Inquiry tetap tersimpan untuk riwayat/audit
+    expect(await Favorit.countDocuments({ kos_id: kosDihapus._id })).toBe(1);
+    expect(await Inquiry.countDocuments({ kos_id: kosDihapus._id })).toBe(1);
     expect(await Favorit.countDocuments({ kos_id: kosLain._id })).toBe(1);
     expect(await Inquiry.countDocuments({ kos_id: kosLain._id })).toBe(1);
   });
 
-  it('menghapus berkas foto lokal dan mengabaikan URL eksternal', async () => {
+  it('soft delete kanonikal mempertahankan riwayat foto dan tidak menghapus berkas yang masih dirujuk', async () => {
     const { user: pemilik, token } = await createUser('pemilik');
     const foto1 = buatFotoUji();
     const foto2 = buatFotoUji();
     dibuat.push(foto1, foto2);
     const kos = await createKos(pemilik, {
+      status_verifikasi: 'approved',
+      status_publikasi: 'archived',
+      version: 1,
       foto: [foto1, foto2, 'https://images.unsplash.com/photo-contoh'],
     });
 
-    const res = await hapusKos(token, kos._id);
+    const res = await request(app)
+      .delete(`/api/pemilik/kos/${kos._id}`)
+      .set(auth(token))
+      .send({ expected_version: 1 });
 
     expect(res.statusCode).toBe(200);
-    expect(fs.existsSync(lokasiFoto(foto1))).toBe(false);
-    expect(fs.existsSync(lokasiFoto(foto2))).toBe(false);
+    // Foto tetap ada untuk riwayat pengajuan/audit
+    expect(fs.existsSync(lokasiFoto(foto1))).toBe(true);
+    expect(fs.existsSync(lokasiFoto(foto2))).toBe(true);
   });
 
-  it('tidak gagal jika berkas foto sudah tidak ada', async () => {
+  it('soft delete kanonikal tidak gagal jika berkas foto sudah tidak ada', async () => {
     const { user: pemilik, token } = await createUser('pemilik');
-    const kos = await createKos(pemilik, { foto: ['/uploads/kos-sudah-hilang.jpg'] });
+    const kos = await createKos(pemilik, {
+      status_verifikasi: 'approved',
+      status_publikasi: 'archived',
+      version: 1,
+      foto: ['/uploads/kos-sudah-hilang.jpg'],
+    });
 
-    const res = await hapusKos(token, kos._id);
+    const res = await request(app)
+      .delete(`/api/pemilik/kos/${kos._id}`)
+      .set(auth(token))
+      .send({ expected_version: 1 });
 
     expect(res.statusCode).toBe(200);
   });
 
   it('tidak menghapus berkas di luar folder uploads', async () => {
     const { user: pemilik, token } = await createUser('pemilik');
-    const kos = await createKos(pemilik, { foto: ['/uploads/../package.json'] });
+    const kos = await createKos(pemilik, {
+      status_verifikasi: 'approved',
+      status_publikasi: 'archived',
+      version: 1,
+      foto: ['/uploads/../package.json'],
+    });
 
-    const res = await hapusKos(token, kos._id);
+    const res = await request(app)
+      .delete(`/api/pemilik/kos/${kos._id}`)
+      .set(auth(token))
+      .send({ expected_version: 1 });
 
     expect(res.statusCode).toBe(200);
     expect(fs.existsSync(path.join(__dirname, '../package.json'))).toBe(true);
@@ -93,13 +159,22 @@ describe('DELETE /api/kos/:id (hapus berantai)', () => {
     const { user: pemilik } = await createUser('pemilik');
     const { token: tokenLain } = await createUser('pemilik');
     const { user: pencari } = await createUser('pencari');
-    const kos = await createKos(pemilik);
+    const kos = await createKos(pemilik, {
+      status_verifikasi: 'approved',
+      status_publikasi: 'archived',
+      version: 1,
+    });
     await Favorit.create({ user_id: pencari._id, kos_id: kos._id });
 
-    const res = await hapusKos(tokenLain, kos._id);
+    // Coba hapus lewat rute kanonikal oleh pemilik lain
+    const res = await request(app)
+      .delete(`/api/pemilik/kos/${kos._id}`)
+      .set(auth(tokenLain))
+      .send({ expected_version: 1 });
 
-    expect(res.statusCode).toBe(403);
+    expect(res.statusCode).toBe(404);
     expect(await Favorit.countDocuments({ kos_id: kos._id })).toBe(1);
+    expect((await Kos.findById(kos._id)).deleted_at).toBeNull();
   });
 });
 
