@@ -65,6 +65,28 @@ function evaluateMessagingPolicy(kosDoc, senderUser) {
   return { allowed: true };
 }
 
+// Sederhana in-memory sliding window rate limiter untuk chat:
+// Maksimal 20 pesan per 60 detik per pengguna
+const userMessageRateMap = new Map();
+
+function checkRateLimit(userId) {
+  const now = Date.now();
+  const windowMs = 60 * 1000;
+  const maxRequests = 20;
+
+  const key = String(userId);
+  const userTimestamps = userMessageRateMap.get(key) || [];
+  const validTimestamps = userTimestamps.filter((ts) => now - ts < windowMs);
+
+  if (validTimestamps.length >= maxRequests) {
+    return false;
+  }
+
+  validTimestamps.push(now);
+  userMessageRateMap.set(key, validTimestamps);
+  return true;
+}
+
 const sendInquiry = async (req, res, next) => {
   try {
     const { kos_id, pesan, client_msg_id } = req.body;
@@ -91,6 +113,11 @@ const sendInquiry = async (req, res, next) => {
       });
     }
 
+    const clientMsgId =
+      typeof client_msg_id === 'string' && client_msg_id.trim()
+        ? client_msg_id.trim().slice(0, 64)
+        : null;
+
     const kos = await Kos.findById(kos_id).populate('pemilik_id', 'status');
     if (!kos) {
       return res.status(404).json({ success: false, message: 'Kos tidak ditemukan' });
@@ -101,43 +128,42 @@ const sendInquiry = async (req, res, next) => {
       return res.status(policy.status).json({ success: false, message: policy.message });
     }
 
-    // 1 Thread Stabil per (pencari, kos): Cari apakah sudah ada thread sebelumnya
+    // Rate limiting pengiriman pesan
+    if (!checkRateLimit(req.user._id)) {
+      return res.status(429).json({
+        success: false,
+        message: 'Pengiriman pesan terlalu cepat. Mohon tunggu sebentar.',
+      });
+    }
+
+    // 1 Thread Stabil per (pencari, kos):
+    // Cari thread yang paling mutakhir (sort updatedAt: -1 jika data legacy memiliki >1 dokumen)
     const existingThread = await Inquiry.findOne({
       pencari_id: req.user._id,
       kos_id,
-    });
+    }).sort({ updatedAt: -1 });
 
     if (existingThread) {
-      // Jika thread lama berstatus 'menunggu', tolak dengan 409
-      if (existingThread.status === 'menunggu') {
-        return res.status(409).json({
-          success: false,
-          message: PESAN_INQUIRY_DUPLIKAT,
-          data: { inquiry_id: existingThread._id },
-        });
+      // Idempotensi berbasis client_msg_id
+      if (clientMsgId) {
+        const duplicateMsg = existingThread.pesan_list?.find(
+          (m) => m.client_msg_id === clientMsgId
+        );
+        if (duplicateMsg) {
+          return res.status(200).json({
+            success: true,
+            message: 'Pesan sudah terkirim (idempotent)',
+            data: existingThread,
+          });
+        }
       }
 
-      // Idempotensi: periksa apakah pesan terakhir sama persis dan baru saja dikirim
-      const lastMsg =
-        existingThread.pesan_list?.[existingThread.pesan_list.length - 1];
-      if (
-        lastMsg &&
-        lastMsg.pengirim_id?.toString() === req.user._id.toString() &&
-        lastMsg.teks === teksTrim &&
-        Date.now() - new Date(lastMsg.createdAt).getTime() < 5000
-      ) {
-        return res.status(200).json({
-          success: true,
-          message: 'Pesan pertanyaan berhasil dikirim ke pemilik kos',
-          data: existingThread,
-        });
-      }
-
-      // Thread lama berstatus 'dibalas': lanjutkan thread yang sama, jangan buat dokumen baru
+      // Lanjutkan thread yang sama tanpa error 409
       existingThread.pesan_list.push({
         pengirim_id: req.user._id,
         pengirim_role: 'pencari',
         teks: teksTrim,
+        client_msg_id: clientMsgId,
       });
       existingThread.status = 'menunggu';
       await existingThread.save();
@@ -149,9 +175,9 @@ const sendInquiry = async (req, res, next) => {
         tautan: '/pemilik/pesan',
       });
 
-      return res.status(201).json({
+      return res.status(200).json({
         success: true,
-        message: 'Pesan pertanyaan berhasil dikirim ke pemilik kos',
+        message: 'Pesan berhasil ditambahkan ke percakapan',
         data: existingThread,
       });
     }
@@ -181,12 +207,14 @@ const sendInquiry = async (req, res, next) => {
       const existing = await Inquiry.findOne({
         pencari_id: req.user._id,
         kos_id: req.body.kos_id,
-      }).catch(() => null);
-      return res.status(409).json({
-        success: false,
-        message: PESAN_INQUIRY_DUPLIKAT,
-        data: existing ? { inquiry_id: existing._id } : undefined,
-      });
+      }).sort({ updatedAt: -1 }).catch(() => null);
+      if (existing) {
+        return res.status(200).json({
+          success: true,
+          message: 'Pesan berhasil dibuka pada percakapan yang ada',
+          data: existing,
+        });
+      }
     }
     next(error);
   }
@@ -215,12 +243,29 @@ const getMyInquiries = async (req, res, next) => {
 const getOwnerInquiries = async (req, res, next) => {
   try {
     const semuaInquiry = await Inquiry.find({ pemilik_id: req.user._id })
-      .populate('kos_id', 'nama alamat')
+      .populate('kos_id', 'nama alamat foto')
       .populate('pencari_id', 'nama nomor_telepon email')
-      .sort({ createdAt: -1 });
+      .sort({ updatedAt: -1, createdAt: -1 });
 
     // Jaring pengaman: lewati inquiry yang kos-nya sudah tidak ada
-    const listInquiry = semuaInquiry.filter((inquiry) => inquiry.kos_id);
+    const listInquiry = semuaInquiry
+      .filter((inquiry) => inquiry.kos_id)
+      .map((item) => {
+        const obj = item.toObject({ virtuals: true });
+        // Sediakan cuplikan dan waktu pesan paling mutakhir dari riwayat
+        let cuplikan = obj.balasan || obj.pesan;
+        let waktu = obj.updatedAt;
+        if (Array.isArray(obj.pesan_list) && obj.pesan_list.length > 0) {
+          const lastMsg = obj.pesan_list[obj.pesan_list.length - 1];
+          cuplikan = lastMsg.teks;
+          waktu = lastMsg.createdAt || obj.updatedAt;
+        }
+        return {
+          ...obj,
+          cuplikan,
+          waktu_terbaru: waktu,
+        };
+      });
 
     res.status(200).json({
       success: true,
@@ -328,6 +373,15 @@ const getInquiryById = async (req, res, next) => {
       });
     }
 
+    // Dukungan batas dan pagination riwayat pesan (default 50 pesan terakhir)
+    const limit = Math.max(1, Math.min(100, parseInt(req.query.limit, 10) || 50));
+    const fullHistory = inquiry.riwayat_pesan || [];
+    const totalPesan = fullHistory.length;
+
+    // Ambil slice pesan terbaru sesuai limit
+    const pagedHistory =
+      totalPesan > limit ? fullHistory.slice(totalPesan - limit) : fullHistory;
+
     res.status(200).json({
       success: true,
       data: {
@@ -336,7 +390,12 @@ const getInquiryById = async (req, res, next) => {
         kos: inquiry.kos_id,
         pencari: inquiry.pencari_id,
         pemilik: inquiry.pemilik_id,
-        riwayat_pesan: inquiry.riwayat_pesan,
+        riwayat_pesan: pagedHistory,
+        pagination: {
+          total_pesan: totalPesan,
+          limit,
+          has_more: totalPesan > limit,
+        },
         createdAt: inquiry.createdAt,
         updatedAt: inquiry.updatedAt,
       },
@@ -393,27 +452,38 @@ const appendMessage = async (req, res, next) => {
       return res.status(policy.status).json({ success: false, message: policy.message });
     }
 
-    // Idempotensi / deduplikasi pengiriman berulang:
-    // Cek apakah pesan terakhir dari pengirim yang sama memiliki teks identik dalam jendela 3 detik
-    const lastExisting =
-      inquiry.pesan_list?.[inquiry.pesan_list.length - 1];
-    if (
-      lastExisting &&
-      lastExisting.pengirim_id.toString() === userIdStr &&
-      lastExisting.teks === teksTrim &&
-      Date.now() - new Date(lastExisting.createdAt).getTime() < 3000
-    ) {
-      return res.status(200).json({
-        success: true,
-        message: 'Pesan berhasil dikirim',
-        data: {
-          _id: lastExisting._id,
-          pengirim_id: lastExisting.pengirim_id,
-          pengirim_role: lastExisting.pengirim_role,
-          teks: lastExisting.teks,
-          createdAt: lastExisting.createdAt,
-        },
+    // Rate limiting pengiriman pesan
+    if (!checkRateLimit(req.user._id)) {
+      return res.status(429).json({
+        success: false,
+        message: 'Pengiriman pesan terlalu cepat. Mohon tunggu sebentar.',
       });
+    }
+
+    const clientMsgId =
+      typeof client_msg_id === 'string' && client_msg_id.trim()
+        ? client_msg_id.trim().slice(0, 64)
+        : null;
+
+    // Idempotensi berbasis client_msg_id: jika ada pesan dengan client_msg_id yang sama persis
+    if (clientMsgId) {
+      const existingMessage = inquiry.pesan_list?.find(
+        (m) => m.client_msg_id === clientMsgId
+      );
+      if (existingMessage) {
+        return res.status(200).json({
+          success: true,
+          message: 'Pesan sudah tersimpan sebelumnya (idempotent)',
+          data: {
+            _id: existingMessage._id,
+            pengirim_id: existingMessage.pengirim_id,
+            pengirim_role: existingMessage.pengirim_role,
+            teks: existingMessage.teks,
+            client_msg_id: existingMessage.client_msg_id,
+            createdAt: existingMessage.createdAt,
+          },
+        });
+      }
     }
 
     const rolePengirim = isPencari ? 'pencari' : 'pemilik';
@@ -421,6 +491,7 @@ const appendMessage = async (req, res, next) => {
       pengirim_id: req.user._id,
       pengirim_role: rolePengirim,
       teks: teksTrim,
+      client_msg_id: clientMsgId,
     };
 
     inquiry.pesan_list.push(pesanBaru);
@@ -453,13 +524,7 @@ const appendMessage = async (req, res, next) => {
         pengirim_id: savedMessage.pengirim_id,
         pengirim_role: savedMessage.pengirim_role,
         teks: savedMessage.teks,
-        createdAt: savedMessage.createdAt,
-      },
-    });
-  } catch (error) {
-    next(error);
-  }
-};
+        client_msg_id: savedMessage.client_msg_id,
         createdAt: savedMessage.createdAt,
       },
     });

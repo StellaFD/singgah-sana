@@ -18,6 +18,12 @@ const pesanSubSchema = new mongoose.Schema(
       trim: true,
       maxlength: [1000, 'Teks pesan maksimal 1000 karakter'],
     },
+    client_msg_id: {
+      type: String,
+      default: null,
+      trim: true,
+      maxlength: [64, 'client_msg_id maksimal 64 karakter'],
+    },
   },
   {
     timestamps: true,
@@ -109,6 +115,7 @@ inquirySchema.virtual('riwayat_pesan').get(function () {
         pengirim_id: p.pengirim_id?._id || p.pengirim_id,
         pengirim_role: p.pengirim_role,
         teks: p.teks,
+        client_msg_id: p.client_msg_id || null,
         createdAt: p.createdAt || null,
       });
     });
