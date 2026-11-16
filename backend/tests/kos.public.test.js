@@ -440,11 +440,24 @@ describe('Perlindungan Data Publik & DTO Whitelist (Keamanan P1)', () => {
 });
 
 describe('Validasi Koordinat Geografis (Model & Controller)', () => {
-  it('menerima koordinat 0 (latitude 0, longitude 0) sebagai titik sah', async () => {
+  it('menerima koordinat 0 (latitude 0, longitude 0) sebagai titik sah pada endpoint kanonikal', async () => {
     const { user: pemilik, token } = await createUser('pemilik');
 
-    const res = await request(app)
+    // Endpoint legacy POST /api/kos ditolak 409 DEPRECATED_ENDPOINT tanpa side-effect
+    const resLegacy = await request(app)
       .post('/api/kos')
+      .set(auth(token))
+      .send({
+        nama: 'Kos Ekuator Legacy',
+        latitude: 0,
+        longitude: 0,
+      });
+    expect(resLegacy.statusCode).toBe(409);
+    expect(resLegacy.body.code).toBe('DEPRECATED_ENDPOINT');
+
+    // Endpoint kanonikal menerima koordinat nested number 0, 0
+    const res = await request(app)
+      .post('/api/pemilik/kos')
       .set(auth(token))
       .send({
         nama: 'Kos Ekuator',
@@ -453,20 +466,24 @@ describe('Validasi Koordinat Geografis (Model & Controller)', () => {
         harga_per_bulan: 1200000,
         tipe: 'campur',
         jumlah_kamar_total: 5,
-        latitude: 0,
-        longitude: 0,
+        jumlah_kamar_tersedia: 5,
+        koordinat: {
+          latitude: 0,
+          longitude: 0,
+        },
       });
 
     expect(res.statusCode).toBe(201);
-    expect(res.body.data.koordinat.latitude).toBe(0);
-    expect(res.body.data.koordinat.longitude).toBe(0);
+    expect(res.body.data.draft.koordinat.latitude).toBe(0);
+    expect(res.body.data.draft.koordinat.longitude).toBe(0);
   });
 
-  it('menolak koordinat yang kosong atau tidak valid saat create dengan 400', async () => {
+  it('koordinat kosong boleh disimpan sebagai draf tanpa fabrikasi tetapi ditolak 422 saat diajukan; out-of-range/tipe invalid ditolak 422', async () => {
     const { user: pemilik, token } = await createUser('pemilik');
 
-    const resMissing = await request(app)
-      .post('/api/kos')
+    // 1. Koordinat kosong boleh simpan draft (201) dan tidak memfabrikasi nilai default 0
+    const resDraftMissing = await request(app)
+      .post('/api/pemilik/kos')
       .set(auth(token))
       .send({
         nama: 'Kos Tanpa Koordinat',
@@ -475,13 +492,24 @@ describe('Validasi Koordinat Geografis (Model & Controller)', () => {
         harga_per_bulan: 1200000,
         tipe: 'campur',
         jumlah_kamar_total: 5,
+        jumlah_kamar_tersedia: 5,
       });
 
-    expect(resMissing.statusCode).toBe(400);
-    expect(resMissing.body.success).toBe(false);
+    expect(resDraftMissing.statusCode).toBe(201);
+    expect(resDraftMissing.body.data.draft.koordinat).toBeUndefined();
+    const kosId = resDraftMissing.body.data._id;
 
+    // Saat diajukan tanpa koordinat -> ditolak 422
+    const resSubmitMissing = await request(app)
+      .post(`/api/pemilik/kos/${kosId}/ajukan`)
+      .set(auth(token))
+      .send({ expected_version: 1 });
+    expect(resSubmitMissing.statusCode).toBe(422);
+    expect(resSubmitMissing.body.code).toBe('VALIDATION_ERROR');
+
+    // 2. Koordinat out of range (latitude > 90) ditolak 422
     const resOutOfRange = await request(app)
-      .post('/api/kos')
+      .post('/api/pemilik/kos')
       .set(auth(token))
       .send({
         nama: 'Kos Out of Range',
@@ -490,113 +518,138 @@ describe('Validasi Koordinat Geografis (Model & Controller)', () => {
         harga_per_bulan: 1200000,
         tipe: 'campur',
         jumlah_kamar_total: 5,
-        latitude: 95, // max 90
-        longitude: 110,
+        koordinat: {
+          latitude: 95, // max 90
+          longitude: 110,
+        },
       });
 
-    expect(resOutOfRange.statusCode).toBe(400);
-    expect(resOutOfRange.body.success).toBe(false);
+    expect(resOutOfRange.statusCode).toBe(422);
+    expect(resOutOfRange.body.code).toBe('VALIDATION_ERROR');
+
+    // 3. Tipe invalid (string bukan number) ditolak 422
+    const resInvalidType = await request(app)
+      .post('/api/pemilik/kos')
+      .set(auth(token))
+      .send({
+        nama: 'Kos Tipe Invalid',
+        koordinat: {
+          latitude: '-7.7654',
+          longitude: '110.3725',
+        },
+      });
+
+    expect(resInvalidType.statusCode).toBe(422);
+    expect(resInvalidType.body.code).toBe('VALIDATION_ERROR');
   });
 
-  it('menolak pembaruan koordinat parsial (hanya latitude tanpa longitude) dengan 400', async () => {
+  it('menolak pembaruan koordinat parsial (hanya latitude tanpa longitude) dengan 422 pada endpoint kanonikal', async () => {
     const { user: pemilik, token } = await createUser('pemilik');
     const kos = await createKos(pemilik, {
-      koordinat: { latitude: -7.7654, longitude: 110.3725 },
+      status_verifikasi: 'draft',
+      version: 1,
+      draft_konten: {
+        nama: 'Kos Uji Koordinat',
+        koordinat: { latitude: -7.7654, longitude: 110.3725 },
+      },
     });
 
     const res = await request(app)
-      .put(`/api/kos/${kos._id}`)
+      .patch(`/api/pemilik/kos/${kos._id}`)
       .set(auth(token))
       .send({
-        latitude: -7.8000,
+        expected_version: 1,
+        koordinat: { latitude: -7.8000 },
       });
 
-    expect(res.statusCode).toBe(400);
+    expect(res.statusCode).toBe(422);
     expect(res.body.success).toBe(false);
   });
 
-  it('mempertahankan koordinat lama jika koordinat tidak dikirim saat update', async () => {
+  it('mempertahankan koordinat lama jika koordinat tidak dikirim saat update draf kanonikal', async () => {
     const { user: pemilik, token } = await createUser('pemilik');
     const kos = await createKos(pemilik, {
-      koordinat: { latitude: -7.7654, longitude: 110.3725 },
+      status_verifikasi: 'draft',
+      version: 1,
+      draft_konten: {
+        nama: 'Kos Awal',
+        koordinat: { latitude: -7.7654, longitude: 110.3725 },
+      },
     });
 
     const res = await request(app)
-      .put(`/api/kos/${kos._id}`)
+      .patch(`/api/pemilik/kos/${kos._id}`)
       .set(auth(token))
       .send({
+        expected_version: 1,
         nama: 'Kos Diperbarui Namanya Saja',
       });
 
     expect(res.statusCode).toBe(200);
-    expect(res.body.data.koordinat.latitude).toBe(-7.7654);
-    expect(res.body.data.koordinat.longitude).toBe(110.3725);
+    expect(res.body.data.draft.koordinat.latitude).toBe(-7.7654);
+    expect(res.body.data.draft.koordinat.longitude).toBe(110.3725);
   });
 
-  it('menolak koordinat bernilai null, boolean, array, whitespace string, atau objek saat update dengan 400', async () => {
+  it('menolak koordinat bernilai tidak valid (bukan angka finite) saat update kanonikal dengan 422', async () => {
     const { user: pemilik, token } = await createUser('pemilik');
     const kos = await createKos(pemilik, {
-      koordinat: { latitude: -7.7654, longitude: 110.3725 },
+      status_verifikasi: 'draft',
+      version: 1,
+      draft_konten: {
+        nama: 'Kos Uji Validasi',
+        koordinat: { latitude: -7.7654, longitude: 110.3725 },
+      },
     });
 
-    // Test null
+    // Test latitude null
     const resNull = await request(app)
-      .put(`/api/kos/${kos._id}`)
+      .patch(`/api/pemilik/kos/${kos._id}`)
       .set(auth(token))
-      .send({ latitude: null, longitude: 110.3725 });
-    expect(resNull.statusCode).toBe(400);
+      .send({ expected_version: 1, koordinat: { latitude: null, longitude: 110.3725 } });
+    expect(resNull.statusCode).toBe(422);
 
     // Test boolean
     const resBool = await request(app)
-      .put(`/api/kos/${kos._id}`)
+      .patch(`/api/pemilik/kos/${kos._id}`)
       .set(auth(token))
-      .send({ latitude: false, longitude: 110.3725 });
-    expect(resBool.statusCode).toBe(400);
+      .send({ expected_version: 1, koordinat: { latitude: false, longitude: 110.3725 } });
+    expect(resBool.statusCode).toBe(422);
 
-    // Test array
-    const resArr = await request(app)
-      .put(`/api/kos/${kos._id}`)
-      .set(auth(token))
-      .send({ latitude: [0], longitude: 110.3725 });
-    expect(resArr.statusCode).toBe(400);
-
-    // Test whitespace string
-    const resWhite = await request(app)
-      .put(`/api/kos/${kos._id}`)
-      .set(auth(token))
-      .send({ latitude: '   ', longitude: 110.3725 });
-    expect(resWhite.statusCode).toBe(400);
-
-    // Test string non-numeric
+    // Test string
     const resString = await request(app)
-      .put(`/api/kos/${kos._id}`)
+      .patch(`/api/pemilik/kos/${kos._id}`)
       .set(auth(token))
-      .send({ latitude: 'abc', longitude: 110.3725 });
-    expect(resString.statusCode).toBe(400);
+      .send({ expected_version: 1, koordinat: { latitude: 'abc', longitude: 110.3725 } });
+    expect(resString.statusCode).toBe(422);
   });
 
-  it('menerima pembaruan koordinat valid termasuk angka 0 dan numeric string nonblank', async () => {
+  it('menerima pembaruan koordinat valid termasuk angka 0 pada endpoint kanonikal', async () => {
     const { user: pemilik, token } = await createUser('pemilik');
     const kos = await createKos(pemilik, {
-      koordinat: { latitude: -7.7654, longitude: 110.3725 },
+      status_verifikasi: 'draft',
+      version: 1,
+      draft_konten: {
+        nama: 'Kos Uji Titik Nol',
+        koordinat: { latitude: -7.7654, longitude: 110.3725 },
+      },
     });
 
     const resUpdateZero = await request(app)
-      .put(`/api/kos/${kos._id}`)
+      .patch(`/api/pemilik/kos/${kos._id}`)
       .set(auth(token))
-      .send({ latitude: 0, longitude: 0 });
+      .send({ expected_version: 1, koordinat: { latitude: 0, longitude: 0 } });
 
     expect(resUpdateZero.statusCode).toBe(200);
-    expect(resUpdateZero.body.data.koordinat.latitude).toBe(0);
-    expect(resUpdateZero.body.data.koordinat.longitude).toBe(0);
+    expect(resUpdateZero.body.data.draft.koordinat.latitude).toBe(0);
+    expect(resUpdateZero.body.data.draft.koordinat.longitude).toBe(0);
 
-    const resUpdateString = await request(app)
-      .put(`/api/kos/${kos._id}`)
+    const resUpdateValid = await request(app)
+      .patch(`/api/pemilik/kos/${kos._id}`)
       .set(auth(token))
-      .send({ latitude: '-7.7890', longitude: '110.3890' });
+      .send({ expected_version: 2, koordinat: { latitude: -7.789, longitude: 110.389 } });
 
-    expect(resUpdateString.statusCode).toBe(200);
-    expect(resUpdateString.body.data.koordinat.latitude).toBe(-7.789);
-    expect(resUpdateString.body.data.koordinat.longitude).toBe(110.389);
+    expect(resUpdateValid.statusCode).toBe(200);
+    expect(resUpdateValid.body.data.draft.koordinat.latitude).toBe(-7.789);
+    expect(resUpdateValid.body.data.draft.koordinat.longitude).toBe(110.389);
   });
 });

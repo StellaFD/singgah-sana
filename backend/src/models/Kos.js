@@ -8,55 +8,59 @@ const kosSchema = new mongoose.Schema(
   {
     nama: {
       type: String,
-      required: [true, 'Nama kos wajib diisi'],
+      default: null,
       trim: true,
       maxlength: [120, 'Nama kos maksimal 120 karakter'],
     },
     deskripsi: {
       type: String,
-      required: [true, 'Deskripsi kos wajib diisi'],
+      default: null,
       trim: true,
     },
     alamat: {
       type: String,
-      required: [true, 'Alamat lengkap kos wajib diisi'],
+      default: null,
       trim: true,
     },
     area_kampus: {
       type: String,
-      default: '',
+      default: null,
       trim: true,
     },
     koordinat: {
       latitude: {
         type: Number,
-        required: [true, 'Latitude wajib diisi'],
         min: [-90, 'Latitude minimal -90'],
         max: [90, 'Latitude maksimal 90'],
+        default: null,
       },
       longitude: {
         type: Number,
-        required: [true, 'Longitude wajib diisi'],
         min: [-180, 'Longitude minimal -180'],
         max: [180, 'Longitude maksimal 180'],
+        default: null,
       },
     },
     foto: {
       type: [String],
       default: [],
     },
+    foto_id_list: {
+      type: [mongoose.Schema.Types.ObjectId],
+      ref: 'MediaAsset',
+      default: [],
+    },
     harga_per_bulan: {
       type: Number,
-      required: [true, 'Harga sewa per bulan wajib diisi'],
-      min: [100000, 'Harga sewa minimal Rp 100.000'],
+      default: null,
     },
     tipe: {
       type: String,
       enum: {
-        values: ['putra', 'putri', 'campur'],
+        values: ['putra', 'putri', 'campur', null, ''],
         message: 'Tipe kos harus salah satu dari: putra, putri, atau campur',
       },
-      required: [true, 'Tipe kos wajib diisi'],
+      default: null,
     },
     fasilitas: {
       type: [String],
@@ -64,7 +68,7 @@ const kosSchema = new mongoose.Schema(
     },
     luas_kamar: {
       type: String,
-      default: '',
+      default: null,
       trim: true,
     },
     peraturan: {
@@ -73,28 +77,59 @@ const kosSchema = new mongoose.Schema(
     },
     jumlah_kamar_total: {
       type: Number,
-      required: [true, 'Jumlah kamar total wajib diisi'],
-      min: [1, 'Jumlah kamar total minimal 1'],
+      default: null,
     },
     jumlah_kamar_tersedia: {
       type: Number,
-      required: [true, 'Jumlah kamar tersedia wajib diisi'],
-      min: [0, 'Jumlah kamar tersedia tidak boleh negatif'],
-      validate: {
-        validator: function (val) {
-          return val <= this.jumlah_kamar_total;
-        },
-        message: 'Kamar tersedia tidak boleh melebihi jumlah kamar total',
-      },
+      default: null,
     },
     status_verifikasi: {
       type: String,
       enum: {
-        values: ['pending', 'approved', 'rejected'],
-        message: 'Status verifikasi harus pending, approved, atau rejected',
+        values: ['draft', 'pending', 'revision', 'approved', 'rejected'],
+        message: 'Status verifikasi harus draft, pending, revision, approved, atau rejected',
       },
-      default: 'pending',
+      default: 'draft',
       index: true,
+    },
+    status_publikasi: {
+      type: String,
+      enum: {
+        values: ['active', 'archived'],
+        message: 'Status publikasi harus active atau archived',
+      },
+      default: 'active',
+      index: true,
+    },
+    status_moderasi: {
+      type: String,
+      enum: {
+        values: ['normal', 'suspended'],
+        message: 'Status moderasi harus normal atau suspended',
+      },
+      default: 'normal',
+      index: true,
+    },
+    deleted_at: {
+      type: Date,
+      default: null,
+      index: true,
+    },
+    version: {
+      type: Number,
+      default: 1,
+    },
+    version_ketersediaan: {
+      type: Number,
+      default: 1,
+    },
+    ketersediaan_diperbarui_pada: {
+      type: Date,
+      default: null,
+    },
+    draft_konten: {
+      type: mongoose.Schema.Types.Mixed,
+      default: null,
     },
     catatan_verifikasi: {
       type: String,
@@ -124,31 +159,61 @@ const kosSchema = new mongoose.Schema(
 
 kosSchema.index({ nama: 'text', deskripsi: 'text', alamat: 'text', area_kampus: 'text' });
 
-// Saat satu kos dihapus (kos.deleteOne()), hapus juga data yang menunjuk ke kos tersebut.
-// Model diambil lewat mongoose.model() di dalam hook supaya tidak terjadi circular require.
-kosSchema.pre('deleteOne', { document: true, query: false }, async function () {
-  await Promise.all([
-    mongoose.model('Favorit').deleteMany({ kos_id: this._id }),
-    mongoose.model('Inquiry').deleteMany({ kos_id: this._id }),
-  ]);
-});
-
-// Berkas foto lokal baru dihapus setelah kos benar-benar terhapus,
-// supaya foto tidak hilang jika penghapusan kos gagal di tengah jalan.
+// Hook deleteOne untuk kompatibilitas penghapusan berkas lokal
+// Berkas fisik TIDAK dihapus jika masih dirujuk MediaAsset, Pengajuan (submission/history), atau Kos lain
 kosSchema.post('deleteOne', { document: true, query: false }, async function () {
   const fotoLokal = (this.foto || []).filter(
     (foto) => typeof foto === 'string' && foto.startsWith('/uploads/')
   );
 
+  if (!fotoLokal.length) return;
+
+  const MediaAsset = mongoose.model('MediaAsset');
+  const Pengajuan = mongoose.model('Pengajuan');
+  const KosModel = this.constructor;
+
   await Promise.all(
     fotoLokal.map(async (foto) => {
-      // basename() mencegah path seperti '/uploads/../.env' keluar dari folder uploads
-      const filePath = path.join(UPLOAD_DIR, path.basename(foto));
+      const filename = path.basename(foto);
+      const filePath = path.join(UPLOAD_DIR, filename);
+
       try {
+        // Cek 1: Apakah masih dirujuk MediaAsset yang belum dihapus permanen?
+        const isReferencedInMedia = await MediaAsset.exists({
+          $or: [
+            { file_path: filePath },
+            { url: { $regex: filename } },
+          ],
+        });
+        if (isReferencedInMedia) {
+          return;
+        }
+
+        // Cek 2: Apakah masih dirujuk dalam submission / history Pengajuan?
+        const isReferencedInPengajuan = await Pengajuan.exists({
+          $or: [
+            { 'before.foto.url': { $regex: filename } },
+            { 'after.foto.url': { $regex: filename } },
+          ],
+        });
+        if (isReferencedInPengajuan) {
+          return;
+        }
+
+        // Cek 3: Apakah masih dirujuk oleh Kos lain?
+        const isReferencedInOtherKos = await KosModel.exists({
+          _id: { $ne: this._id },
+          foto: foto,
+        });
+        if (isReferencedInOtherKos) {
+          return;
+        }
+
+        // Hanya hapus berkas fisik jika benar-benar tidak ada rujukan tersisa
         await fs.promises.unlink(filePath);
       } catch (error) {
         if (error.code !== 'ENOENT') {
-          console.error(`[Kos] Gagal menghapus berkas foto ${filePath}: ${error.message}`);
+          console.error(`[Kos] Gagal membersihkan berkas foto ${filePath}: ${error.message}`);
         }
       }
     })

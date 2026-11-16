@@ -1,6 +1,5 @@
 'use client';
 
-import { useEffect, useMemo } from 'react';
 import { useWatch } from 'react-hook-form';
 import { Check, AlertTriangle } from 'lucide-react';
 import { Badge } from '@/components/owner-ui/badge';
@@ -8,38 +7,48 @@ import { Alert } from '@/components/owner-ui/state';
 import { capitalize, formatRupiah } from '@/lib/owner/format';
 import { KosPhoto } from '../kos-photo';
 import type { KosForm } from './types';
+import type { PhotoPickerItem } from './photo-picker';
 
 type StepTinjauProps = {
   form: KosForm;
-  files: File[];
-  existingPhotos: string[];
+  photos?: PhotoPickerItem[];
+  existingPhotos?: string[];
   editing: boolean;
   confirmed: boolean;
   onConfirmedChange: (value: boolean) => void;
   confirmError?: string;
 };
 
-export function StepTinjau({ form, files, existingPhotos, editing, confirmed, onConfirmedChange, confirmError }: StepTinjauProps) {
+export function StepTinjau({
+  form,
+  photos = [],
+  existingPhotos = [],
+  editing,
+  confirmed,
+  onConfirmedChange,
+  confirmError,
+}: StepTinjauProps) {
   const values = useWatch({ control: form.control });
-  const fotoUrls = (values.foto_urls ?? []).filter((url): url is string => Boolean(url));
   const fasilitas = values.fasilitas ?? [];
   const peraturan = values.peraturan ?? [];
-  const filePreview = useMemo(() => (files[0] ? URL.createObjectURL(files[0]) : null), [files]);
-  useEffect(
-    () => () => {
-      if (filePreview) URL.revokeObjectURL(filePreview);
-    },
-    [filePreview],
-  );
 
-  const cover = filePreview ?? fotoUrls[0] ?? existingPhotos[0] ?? null;
-  const fotoCount = editing ? existingPhotos.length : files.length || fotoUrls.length;
+  const cover = photos[0]?.url ?? existingPhotos[0] ?? null;
+  const fotoCount = photos.length > 0 ? photos.length : existingPhotos.length;
   const harga = Number(values.harga_per_bulan);
 
   const checks = [
-    { ok: Boolean(values.alamat && values.latitude && values.longitude), text: 'Alamat lengkap dan titik lokasi sudah terisi' },
-    { ok: fotoCount > 0, text: `${fotoCount} foto kos tersedia${fotoCount > 0 ? ', foto pertama menjadi foto utama' : ''}` },
-    { ok: fasilitas.length > 0, text: `${fasilitas.length} fasilitas dan ${peraturan.length} aturan` },
+    {
+      ok: Boolean(values.alamat && values.latitude && values.longitude),
+      text: 'Alamat lengkap dan titik lokasi sudah terisi',
+    },
+    {
+      ok: fotoCount > 0,
+      text: `${fotoCount} foto kos tersedia${fotoCount > 0 ? ', foto pertama menjadi foto utama' : ''}`,
+    },
+    {
+      ok: fasilitas.length > 0,
+      text: `${fasilitas.length} fasilitas dan ${peraturan.length} aturan`,
+    },
     {
       ok: Boolean(values.jumlah_kamar_total),
       text: `${values.jumlah_kamar_total || 0} total kamar · ${values.jumlah_kamar_tersedia || 0} tersedia`,
@@ -78,8 +87,8 @@ export function StepTinjau({ form, files, existingPhotos, editing, confirmed, on
 
       <Alert>
         {editing
-          ? 'Perubahan nama, lokasi, harga, fasilitas, atau total kamar membuat listing ditinjau ulang oleh admin sebelum tayang kembali.'
-          : 'Setelah dikirim, listing belum langsung tayang. Status peninjauan dapat dilihat pada Kos saya.'}
+          ? 'Perubahan yang disimpan akan diajukan ke admin sebagai draf perubahan. Listing publik tetap menampilkan versi yang sedang tayang sampai disetujui.'
+          : 'Setelah dikirim, listing belum langsung tayang di pencarian publik dan akan ditinjau oleh admin terlebih dahulu.'}
       </Alert>
 
       <div>

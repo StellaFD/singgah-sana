@@ -8,6 +8,7 @@ import {
 } from 'lucide-react';
 import { getAdminStats } from '../../lib/adminApi';
 import { ApiError } from '../../lib/api';
+import { RecentAdminActivity } from './RecentAdminActivity';
 
 type DashboardStats = {
   kos: {
@@ -293,9 +294,7 @@ export default function AdminDashboardContent({
               </p>
             </div>
           </div>
-          <p className="mt-5 rounded-lg bg-slate-50 px-4 py-3 text-sm leading-6 text-slate-600">
-            Riwayat aktivitas belum tersedia.
-          </p>
+          <RecentAdminActivity expireSession={expireSession} />
         </article>
       </section>
 

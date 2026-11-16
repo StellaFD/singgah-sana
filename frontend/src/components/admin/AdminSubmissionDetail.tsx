@@ -14,6 +14,7 @@ import {
 } from '../../lib/adminSubmissionApi';
 import { shouldUseAdminV1Api } from '../../lib/adminApiMode';
 import { ApiError } from '../../lib/api';
+import { KosPhoto } from '@/features/owner-kos/components/kos-photo';
 
 type AdminSubmissionDetailProps = {
   expireSession: () => void;
@@ -523,7 +524,17 @@ function Snapshot({
               {label}
             </dt>
             <dd className="whitespace-pre-line break-words text-sm text-slate-700">
-              {formatValue(value[key])}
+              {key === 'foto' ? (
+                <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+                  {value.foto.map((photo, index) => (
+                    <figure key={`${photo.asset_id ?? photo.url}-${index}`}>
+                      <KosPhoto src={photo.url} alt={photo.alt || `Foto kos ${index + 1}`} className="aspect-[4/3] w-full" />
+                      <figcaption className="mt-1 text-xs text-slate-500">{photo.alt || `Foto ${index + 1}`}</figcaption>
+                    </figure>
+                  ))}
+                  {value.foto.length === 0 && 'Tidak ada foto'}
+                </div>
+              ) : formatValue(value[key])}
             </dd>
           </div>
         ))}

@@ -24,8 +24,12 @@ const FILTERS: { value: Filter; label: string }[] = [
   { value: 'semua', label: 'Semua' },
   { value: 'terbit', label: 'Terbit' },
   { value: 'ditinjau', label: 'Ditinjau' },
-  { value: 'ditinjau_ulang', label: 'Ditinjau ulang' },
-  { value: 'perlu_revisi', label: 'Ditolak' },
+  { value: 'ditinjau_ulang', label: 'Perubahan' },
+  { value: 'perlu_revisi', label: 'Perlu revisi' },
+  { value: 'ditolak', label: 'Ditolak' },
+  { value: 'draf', label: 'Draf' },
+  { value: 'diarsipkan', label: 'Diarsipkan' },
+  { value: 'ditangguhkan', label: 'Ditangguhkan' },
 ];
 
 export function KosSayaView() {
@@ -34,6 +38,7 @@ export function KosSayaView() {
   const toast = useToast();
   const [query, setQuery] = useState('');
   const [filter, setFilter] = useState<Filter>('semua');
+  const [page, setPage] = useState(1);
   const [draft, setDraft] = useState<KosDraft | null>(null);
   const [confirmDraft, setConfirmDraft] = useState(false);
 
@@ -44,10 +49,23 @@ export function KosSayaView() {
   }, [userId]);
 
   const counts = useMemo(() => {
-    const result: Record<Filter, number> = { semua: 0, terbit: 0, ditinjau: 0, ditinjau_ulang: 0, perlu_revisi: 0 };
+    const result: Record<Filter, number> = {
+      semua: 0,
+      terbit: 0,
+      ditinjau: 0,
+      ditinjau_ulang: 0,
+      perlu_revisi: 0,
+      ditolak: 0,
+      draf: 0,
+      diarsipkan: 0,
+      ditangguhkan: 0,
+    };
     for (const kos of data ?? []) {
       result.semua += 1;
-      result[getKosStatus(kos).key] += 1;
+      const statusKey = getKosStatus(kos).key;
+      if (result[statusKey] !== undefined) {
+        result[statusKey] += 1;
+      }
     }
     return result;
   }, [data]);
@@ -60,6 +78,10 @@ export function KosSayaView() {
       return matchFilter && matchQuery;
     });
   }, [data, filter, query]);
+
+  const totalPages = Math.max(1, Math.ceil(visible.length / 12));
+  const currentPage = Math.min(page, totalPages);
+  const pageItems = visible.slice((currentPage - 1) * 12, currentPage * 12);
 
   const removeDraft = () => {
     if (userId) deleteDraft(userId);
@@ -83,7 +105,7 @@ export function KosSayaView() {
             type="search"
             placeholder="Cari nama atau area kos…"
             value={query}
-            onChange={(e) => setQuery(e.target.value)}
+            onChange={(e) => { setQuery(e.target.value); setPage(1); }}
             className="pl-11"
           />
         </div>
@@ -99,7 +121,7 @@ export function KosSayaView() {
             type="button"
             role="tab"
             aria-selected={filter === value}
-            onClick={() => setFilter(value)}
+            onClick={() => { setFilter(value); setPage(1); }}
             className={cn(
               'shrink-0 rounded-full border px-4 py-2 text-sm font-medium transition-colors',
               filter === value ? 'border-brand bg-brand-soft text-brand' : 'border-line bg-white text-ink hover:border-brand-ring',
@@ -162,12 +184,22 @@ export function KosSayaView() {
           />
         ) : (
           <ul className="flex flex-col gap-3">
-            {visible.map((kos) => (
+            {pageItems.map((kos) => (
               <KosListItem key={kos._id} kos={kos} />
             ))}
           </ul>
         )}
       </div>
+
+      {!loading && !error && totalPages > 1 && (
+        <nav aria-label="Halaman daftar kos" className="mt-5 flex flex-wrap items-center justify-between gap-3 text-sm">
+          <p>Halaman {currentPage} dari {totalPages} · {visible.length} kos</p>
+          <div className="flex gap-2">
+            <Button variant="secondary" disabled={currentPage === 1} onClick={() => setPage(currentPage - 1)}>Sebelumnya</Button>
+            <Button variant="secondary" disabled={currentPage === totalPages} onClick={() => setPage(currentPage + 1)}>Berikutnya</Button>
+          </div>
+        </nav>
+      )}
 
       <ConfirmDialog
         open={confirmDraft}

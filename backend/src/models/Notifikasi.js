@@ -6,6 +6,7 @@ const TIPE_NOTIFIKASI = [
   'kos_menunggu',      // admin: ada kos baru / perubahan kos yang perlu ditinjau
   'kos_disetujui',     // pemilik: kos disetujui admin
   'kos_ditolak',       // pemilik: kos ditolak admin
+  'kos_revisi',        // pemilik: kos diminta revisi oleh admin
   'laporan_baru',      // admin: ada laporan pengguna
   'laporan_ditangani', // pencari: laporan yang dikirim sudah ditindaklanjuti
   'info',

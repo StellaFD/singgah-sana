@@ -1,6 +1,6 @@
 const Favorit = require('../models/Favorit');
 const Kos = require('../models/Kos');
-const { formatPublicKos } = require('./kosController');
+const { formatPublicKos, isKosPubliclyVisible } = require('./kosController');
 
 const getMyFavorites = async (req, res, next) => {
   try {
@@ -17,7 +17,7 @@ const getMyFavorites = async (req, res, next) => {
     // Jaring pengaman: lewati favorit yang kos-nya sudah tidak ada
     const listFavorit = semuaFavorit.filter((favorit) => favorit.kos_id).map(favorit => {
       const kos = favorit.kos_id;
-      const available = kos.status_verifikasi === 'approved' && kos.pemilik_id?.status !== 'suspended';
+      const available = isKosPubliclyVisible(kos);
       return { _id: favorit._id, createdAt: favorit.createdAt, user_id: favorit.user_id,
         kos_id: available ? formatPublicKos(kos) : { _id: kos._id, unavailable: true } };
     });
@@ -41,7 +41,7 @@ const addFavorite = async (req, res, next) => {
       return res.status(404).json({ success: false, message: 'Kos tidak ditemukan' });
     }
 
-    if (kos.status_verifikasi !== 'approved' || kos.pemilik_id?.status === 'suspended') {
+    if (!isKosPubliclyVisible(kos)) {
       return res.status(400).json({
         success: false,
         message: 'Kos belum disetujui untuk publik sehingga belum dapat difavoritkan',

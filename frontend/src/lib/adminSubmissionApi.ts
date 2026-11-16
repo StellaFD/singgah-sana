@@ -17,7 +17,7 @@ export type AdminKosContent = {
   luas_kamar: string | null;
   jumlah_kamar_total: number;
   foto: Array<{
-    asset_id: string;
+    asset_id: string | null;
     url: string;
     alt: string;
   }>;
@@ -194,7 +194,7 @@ function isKosContent(value: unknown): value is AdminKosContent {
     value.foto.every(
       (photo) =>
         isRecord(photo) &&
-        typeof photo.asset_id === 'string' &&
+        (typeof photo.asset_id === 'string' || photo.asset_id === null) &&
         typeof photo.url === 'string' &&
         typeof photo.alt === 'string'
     )

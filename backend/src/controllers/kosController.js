@@ -3,6 +3,7 @@ const Kos = require('../models/Kos');
 const User = require('../models/User');
 const Favorit = require('../models/Favorit');
 const Inquiry = require('../models/Inquiry');
+const { getPublicVisibilityQuery, isKosPubliclyVisible } = require('../utils/visibility');
 const {
   safeSearchTerm,
   escapeRegex,
@@ -43,16 +44,20 @@ const buildPublicKosFilter = (query) => {
     area_kampus,
   } = query;
 
-  const filter = { status_verifikasi: 'approved' };
+  const filter = {
+    ...getPublicVisibilityQuery(),
+  };
 
   if (q) {
     const term = safeSearchTerm(q);
-    filter.$or = [
-      { nama: { $regex: term, $options: 'i' } },
-      { alamat: { $regex: term, $options: 'i' } },
-      { area_kampus: { $regex: term, $options: 'i' } },
-      { deskripsi: { $regex: term, $options: 'i' } },
-    ];
+    filter.$and.push({
+      $or: [
+        { nama: { $regex: term, $options: 'i' } },
+        { alamat: { $regex: term, $options: 'i' } },
+        { area_kampus: { $regex: term, $options: 'i' } },
+        { deskripsi: { $regex: term, $options: 'i' } },
+      ],
+    });
   }
 
   if (tipe && tipe !== 'all' && tipe !== 'Semua') {
@@ -207,7 +212,10 @@ const formatPublicKos = (kosDoc) => {
 const getAllKosPublic = async (req, res, next) => {
   try {
     const filter = buildPublicKosFilter(req.query);
-    filter.pemilik_id = { $nin: await User.find({ status: 'suspended' }).distinct('_id') };
+    const activeOwnerIds = await User.find({
+      $or: [{ status: 'active' }, { status: { $exists: false } }],
+    }).distinct('_id');
+    filter.pemilik_id = { $in: activeOwnerIds };
     const { sort, page, limit } = req.query;
 
     let sortOptions = ALLOWED_SORT_OPTIONS.terbaru;
@@ -263,7 +271,10 @@ const getAllKosPublic = async (req, res, next) => {
 const getKosMapPublic = async (req, res, next) => {
   try {
     const filter = buildPublicKosFilter(req.query);
-    filter.pemilik_id = { $nin: await User.find({ status: 'suspended' }).distinct('_id') };
+    const activeOwnerIds = await User.find({
+      $or: [{ status: 'active' }, { status: { $exists: false } }],
+    }).distinct('_id');
+    filter.pemilik_id = { $in: activeOwnerIds };
     const MAX_MAP_MARKERS = 500;
 
     const totalCount = await Kos.countDocuments(filter);
@@ -304,7 +315,7 @@ const getKosById = async (req, res, next) => {
       'nama nomor_telepon email foto_profil role status'
     );
 
-    if (!kos) {
+    if (!kos || (kos.deleted_at !== null && kos.deleted_at !== undefined)) {
       return res.status(404).json({
         success: false,
         message: 'Kos tidak ditemukan',
@@ -321,7 +332,9 @@ const getKosById = async (req, res, next) => {
     const isOwner = Boolean(user && ownerIdStr && ownerIdStr === user._id.toString());
     const isAdmin = Boolean(user && user.role === 'admin');
 
-    if (kos.status_verifikasi !== 'approved' || kos.pemilik_id?.status === 'suspended') {
+    const isPublic = isKosPubliclyVisible(kos);
+
+    if (!isPublic) {
       if (!isOwner && !isAdmin) {
         return res.status(403).json({
           success: false,
@@ -350,89 +363,10 @@ const getKosById = async (req, res, next) => {
 
 const createKos = async (req, res, next) => {
   try {
-    const {
-      nama,
-      deskripsi,
-      alamat,
-      area_kampus,
-      latitude,
-      longitude,
-      harga_per_bulan,
-      tipe,
-      fasilitas,
-      luas_kamar,
-      peraturan,
-      jumlah_kamar_total,
-      jumlah_kamar_tersedia,
-      foto_urls,
-    } = req.body;
-
-    if (!nama || !deskripsi || !alamat || !harga_per_bulan || !tipe || !jumlah_kamar_total) {
-      return res.status(400).json({
-        success: false,
-        message: 'Mohon lengkapi field wajib: nama, deskripsi, alamat, harga_per_bulan, tipe, jumlah_kamar_total',
-      });
-    }
-
-    const parsedLat = parseStrictCoordinate(latitude, -90, 90);
-    const parsedLng = parseStrictCoordinate(longitude, -180, 180);
-
-    if (parsedLat === null || parsedLng === null) {
-      return res.status(400).json({
-        success: false,
-        message: 'Koordinat lokasi (latitude [-90, 90] dan longitude [-180, 180]) wajib diisi dengan angka yang valid',
-      });
-    }
-
-    let daftarFoto = [];
-    if (req.files && req.files.length > 0) {
-      daftarFoto = req.files.map((file) => `/uploads/${file.filename}`);
-    } else if (foto_urls) {
-      daftarFoto = Array.isArray(foto_urls) ? foto_urls : [foto_urls];
-    } else {
-      daftarFoto = [
-        'https://images.unsplash.com/photo-1522771739844-6a9f6d5f14af?auto=format&fit=crop&w=800&q=80',
-      ];
-    }
-
-    let parsedFasilitas = [];
-    if (fasilitas) {
-      parsedFasilitas = Array.isArray(fasilitas) ? fasilitas : fasilitas.split(',').map((f) => f.trim());
-    }
-
-    let parsedPeraturan = ['Akses 24 Jam', 'Dilarang Merokok di Kamar'];
-    if (peraturan) {
-      parsedPeraturan = Array.isArray(peraturan) ? peraturan : peraturan.split(',').map((p) => p.trim());
-    }
-
-    const kosBaru = await Kos.create({
-      nama,
-      deskripsi,
-      alamat,
-      area_kampus: area_kampus || 'Sekitar UGM',
-      koordinat: {
-        latitude: parsedLat,
-        longitude: parsedLng,
-      },
-      foto: daftarFoto,
-      harga_per_bulan: Number(harga_per_bulan),
-      tipe: tipe.toLowerCase(),
-      fasilitas: parsedFasilitas,
-      luas_kamar: luas_kamar || '',
-      peraturan: parsedPeraturan,
-      jumlah_kamar_total: Number(jumlah_kamar_total),
-      jumlah_kamar_tersedia:
-        jumlah_kamar_tersedia !== undefined
-          ? Number(jumlah_kamar_tersedia)
-          : Number(jumlah_kamar_total),
-      status_verifikasi: 'pending',
-      pemilik_id: req.user._id,
-    });
-
-    res.status(201).json({
-      success: true,
-      message: 'Kos berhasil didaftarkan dan sedang menunggu verifikasi oleh Administrator',
-      data: kosBaru,
+    return res.status(409).json({
+      success: false,
+      code: 'DEPRECATED_ENDPOINT',
+      message: 'Endpoint pendaftaran kos legacy telah ditutup. Gunakan POST /api/pemilik/kos.',
     });
   } catch (error) {
     next(error);
@@ -455,9 +389,9 @@ const getMyKos = async (req, res, next) => {
 
 const updateKos = async (req, res, next) => {
   try {
-    let kos = await Kos.findById(req.params.id);
+    const kos = await Kos.findById(req.params.id);
 
-    if (!kos) {
+    if (!kos || kos.deleted_at !== null) {
       return res.status(404).json({ success: false, message: 'Kos tidak ditemukan' });
     }
 
@@ -468,80 +402,10 @@ const updateKos = async (req, res, next) => {
       });
     }
 
-    const {
-      nama,
-      deskripsi,
-      alamat,
-      area_kampus,
-      latitude,
-      longitude,
-      harga_per_bulan,
-      tipe,
-      fasilitas,
-      luas_kamar,
-      peraturan,
-      jumlah_kamar_total,
-      jumlah_kamar_tersedia,
-    } = req.body;
-
-    if (nama) kos.nama = nama;
-    if (deskripsi) kos.deskripsi = deskripsi;
-    if (alamat) kos.alamat = alamat;
-    if (area_kampus) kos.area_kampus = area_kampus;
-
-    if (latitude !== undefined || longitude !== undefined) {
-      if (latitude === undefined || longitude === undefined) {
-        return res.status(400).json({
-          success: false,
-          message: 'Pembaruan koordinat harus menyertakan pasangan latitude dan longitude lengkap',
-        });
-      }
-      const parsedLat = parseStrictCoordinate(latitude, -90, 90);
-      const parsedLng = parseStrictCoordinate(longitude, -180, 180);
-
-      if (parsedLat === null || parsedLng === null) {
-        return res.status(400).json({
-          success: false,
-          message: 'Nilai koordinat latitude [-90, 90] atau longitude [-180, 180] tidak valid',
-        });
-      }
-      kos.koordinat = { latitude: parsedLat, longitude: parsedLng };
-    }
-
-    if (harga_per_bulan) kos.harga_per_bulan = Number(harga_per_bulan);
-    if (tipe) kos.tipe = tipe.toLowerCase();
-    if (luas_kamar) kos.luas_kamar = luas_kamar;
-    if (fasilitas) {
-      kos.fasilitas = Array.isArray(fasilitas) ? fasilitas : fasilitas.split(',').map((f) => f.trim());
-    }
-    if (peraturan) {
-      kos.peraturan = Array.isArray(peraturan) ? peraturan : peraturan.split(',').map((p) => p.trim());
-    }
-    if (jumlah_kamar_total !== undefined) kos.jumlah_kamar_total = Number(jumlah_kamar_total);
-    if (jumlah_kamar_tersedia !== undefined) {
-      kos.jumlah_kamar_tersedia = Number(jumlah_kamar_tersedia);
-    }
-
-    // Pemilik mengubah data penting pada kos yang sudah diverifikasi -> kembali ke antrean verifikasi
-    let butuhVerifikasiUlang = false;
-    if (req.user.role !== 'admin' && kos.status_verifikasi !== 'pending') {
-      butuhVerifikasiUlang = FIELD_BUTUH_VERIFIKASI_ULANG.some((f) => kos.isModified(f));
-      if (butuhVerifikasiUlang) {
-        kos.status_verifikasi = 'pending';
-        kos.catatan_verifikasi = 'Data kos diperbarui oleh pemilik dan menunggu verifikasi ulang admin.';
-        kos.diverifikasi_oleh = null;
-        kos.diverifikasi_pada = null;
-      }
-    }
-
-    const updatedKos = await kos.save();
-
-    res.status(200).json({
-      success: true,
-      message: butuhVerifikasiUlang
-        ? 'Data kos berhasil diperbarui dan akan ditinjau ulang oleh Administrator sebelum tayang kembali'
-        : 'Data kos berhasil diperbarui',
-      data: updatedKos,
+    return res.status(409).json({
+      success: false,
+      code: 'DEPRECATED_ENDPOINT',
+      message: 'Endpoint pembaruan kos legacy telah ditutup. Gunakan PATCH /api/pemilik/kos/:id untuk draf atau PUT /api/pemilik/kos/:id/perubahan untuk perubahan listing approved.',
     });
   } catch (error) {
     next(error);
@@ -552,7 +416,7 @@ const deleteKos = async (req, res, next) => {
   try {
     const kos = await Kos.findById(req.params.id);
 
-    if (!kos) {
+    if (!kos || kos.deleted_at !== null) {
       return res.status(404).json({ success: false, message: 'Kos tidak ditemukan' });
     }
 
@@ -563,15 +427,10 @@ const deleteKos = async (req, res, next) => {
       });
     }
 
-    await Promise.all([
-      Favorit.deleteMany({ kos_id: kos._id }),
-      Inquiry.deleteMany({ kos_id: kos._id }),
-    ]);
-    await kos.deleteOne();
-
-    res.status(200).json({
-      success: true,
-      message: 'Kos berhasil dihapus dari sistem',
+    return res.status(409).json({
+      success: false,
+      code: 'DEPRECATED_ENDPOINT',
+      message: 'Endpoint penghapusan kos legacy telah ditutup. Gunakan DELETE /api/pemilik/kos/:id dengan expected_version.',
     });
   } catch (error) {
     next(error);
@@ -580,6 +439,9 @@ const deleteKos = async (req, res, next) => {
 
 module.exports = {
   formatPublicKos,
+  buildPublicKosFilter,
+  isKosPubliclyVisible,
+  getPublicVisibilityQuery,
   getAllKosPublic,
   getKosMapPublic,
   getKosById,

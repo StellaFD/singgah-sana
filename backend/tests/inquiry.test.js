@@ -49,12 +49,12 @@ describe('POST /api/inquiries (kirim pertanyaan)', () => {
     expect(res.statusCode).toBe(404);
   });
 
-  it('menolak pesan lebih dari 1000 karakter dengan 400', async () => {
+  it('menolak pesan lebih dari 1000 karakter dengan 422', async () => {
     const kos = await createKos(pemilik);
 
     const res = await kirimInquiry(tokenPencari, { kos_id: kos._id, pesan: 'a'.repeat(1001) });
 
-    expect(res.statusCode).toBe(400);
+    expect(res.statusCode).toBe(422);
     expect(res.body.message).toMatch(/maksimal 1000 karakter/);
   });
 
@@ -138,10 +138,10 @@ describe('PATCH /api/inquiries/:id/reply (balas pertanyaan)', () => {
     expect((await Inquiry.findById(inquiry._id)).balasan).toBe('Balasan pertama');
   });
 
-  it('menolak balasan lebih dari 1000 karakter dengan 400', async () => {
+  it('menolak balasan lebih dari 1000 karakter dengan 422', async () => {
     const res = await balasInquiry(tokenPemilik, inquiry._id, 'b'.repeat(1001));
 
-    expect(res.statusCode).toBe(400);
+    expect(res.statusCode).toBe(422);
     expect(res.body.message).toMatch(/maksimal 1000 karakter/);
     expect((await Inquiry.findById(inquiry._id)).status).toBe('menunggu');
   });
@@ -181,10 +181,10 @@ describe('Inquiry: validasi input dan hak akses', () => {
     expect(res.body.success).toBe(false);
   });
 
-  it('menolak pesan yang hanya berisi spasi dengan 400', async () => {
+  it('menolak pesan yang hanya berisi spasi dengan 422', async () => {
     const res = await kirimInquiry(tokenPencari, { kos_id: kos._id, pesan: '    ' });
 
-    expect(res.statusCode).toBe(400);
+    expect(res.statusCode).toBe(422);
     expect(await Inquiry.countDocuments()).toBe(0);
   });
 

@@ -1,13 +1,16 @@
 const Kos = require('../models/Kos');
 const User = require('../models/User');
+const Pengajuan = require('../models/Pengajuan');
+const { logAdminAction } = require('../services/auditService');
 const { safeSearchTerm, parsePagination, csvCell } = require('../utils/helpers');
 const { kirimNotifikasi } = require('../utils/notifikasi');
+const { getPublicVisibilityQuery } = require('../utils/visibility');
 
 const getAllKosAdmin = async (req, res, next) => {
   try {
     const { status, q, page, limit } = req.query;
 
-    const filter = {};
+    const filter = { deleted_at: null };
     if (status) {
       filter.status_verifikasi = String(status).toLowerCase();
     }
@@ -20,9 +23,12 @@ const getAllKosAdmin = async (req, res, next) => {
       ];
     }
 
-    const { pageNum, limitNum, skip } = parsePagination(page, limit, 15);
+    const { pageNum, limitNum } = parsePagination(page, limit, 15);
 
     const totalData = await Kos.countDocuments(filter);
+    const totalPages = Math.max(1, Math.ceil(totalData / limitNum));
+    const currentPage = Math.min(pageNum, totalPages);
+    const skip = (currentPage - 1) * limitNum;
     const dataKos = await Kos.find(filter)
       .populate('pemilik_id', 'nama nomor_telepon email')
       .populate('diverifikasi_oleh', 'nama email')
@@ -35,8 +41,8 @@ const getAllKosAdmin = async (req, res, next) => {
       count: dataKos.length,
       pagination: {
         totalData,
-        totalPages: Math.ceil(totalData / limitNum),
-        currentPage: pageNum,
+        totalPages,
+        currentPage,
         limit: limitNum,
       },
       data: dataKos,
@@ -48,7 +54,7 @@ const getAllKosAdmin = async (req, res, next) => {
 
 const verifyKos = async (req, res, next) => {
   try {
-    const { status_verifikasi, catatan_verifikasi } = req.body;
+    const { status_verifikasi, catatan_verifikasi, expected_version } = req.body;
 
     if (!['approved', 'rejected'].includes(status_verifikasi)) {
       return res.status(400).json({
@@ -65,25 +71,47 @@ const verifyKos = async (req, res, next) => {
       return res.status(404).json({ success: false, message: 'Kos tidak ditemukan' });
     }
 
-    kos.status_verifikasi = status_verifikasi;
-    kos.catatan_verifikasi = catatan_verifikasi || (status_verifikasi === 'approved' ? 'Data telah diverifikasi dan disetujui untuk tayang publik.' : 'Pendaftaran ditolak karena informasi belum memenuhi kriteria.');
-    kos.diverifikasi_oleh = req.user._id;
-    kos.diverifikasi_pada = new Date();
+    // Periksa apakah listing memiliki pengajuan aktif kanonikal
+    const pendingPengajuan = await Pengajuan.findOne({
+      kos_id: kos._id,
+      is_active: true,
+      status: 'pending',
+    });
 
-    const updatedKos = await Kos.findOneAndUpdate({ _id: kos._id, status_verifikasi: 'pending' }, {
-      $set: { status_verifikasi, catatan_verifikasi: kos.catatan_verifikasi,
-        diverifikasi_oleh: req.user._id, diverifikasi_pada: kos.diverifikasi_pada },
-      $inc: { __v: 1 },
-    }, { new: true, runValidators: true });
-    if (!updatedKos) return res.status(409).json({ success: false, code: 'CONFLICT', message: 'Listing sudah diputuskan atau berubah. Muat ulang antrean.' });
-    await kirimNotifikasi(kos.pemilik_id, { tipe: status_verifikasi === 'approved' ? 'kos_disetujui' : 'kos_ditolak',
-      judul: status_verifikasi === 'approved' ? 'Listing disetujui' : 'Pengajuan listing ditolak',
-      isi: kos.catatan_verifikasi, tautan: `/pemilik/kos/${kos._id}` });
+    if (pendingPengajuan) {
+      // Legacy route TIDAK boleh bypass expected_version atau transaksi/snapshot kanonikal.
+      // Wajib mensyaratkan expected_version yang sesuai dengan pengajuan kanonikal atau ditolak 409 tanpa side-effect.
+      if (typeof expected_version !== 'number' || expected_version !== pendingPengajuan.version) {
+        return res.status(409).json({
+          success: false,
+          code: 'CONFLICT',
+          message: 'Listing memiliki pengajuan aktif kanonikal. Verifikasi memerlukan expected_version pengajuan yang sesuai atau gunakan endpoint kanonikal PATCH /api/admin/pengajuan/:id/keputusan.',
+        });
+      }
 
-    res.status(200).json({
-      success: true,
-      message: `Status kos berhasil diubah menjadi '${status_verifikasi}'`,
-      data: updatedKos,
+      // Delegasikan ke canonical submissionService.decideSubmission untuk atomisitas transaksi, snapshot, dan audit
+      const { decideSubmission } = require('../services/submissionService');
+      const catatanFinal = catatan_verifikasi || (status_verifikasi === 'approved' ? 'Data telah diverifikasi dan disetujui untuk tayang publik.' : 'Pendaftaran ditolak karena informasi belum memenuhi kriteria.');
+      const decisionResult = await decideSubmission(req.user, pendingPengajuan._id, {
+        keputusan: status_verifikasi,
+        catatan_verifikasi: catatanFinal,
+        expected_version,
+      });
+
+      const updatedKos = await Kos.findById(kos._id);
+      return res.status(200).json({
+        success: true,
+        message: `Status kos berhasil diubah menjadi '${status_verifikasi}'`,
+        data: updatedKos,
+        submission: decisionResult,
+      });
+    }
+
+    // Jika belum ada pengajuan kanonikal aktif, tolak 409 dan arahkan pemilik untuk menarik listing ke draf
+    return res.status(409).json({
+      success: false,
+      code: 'CONFLICT',
+      message: 'Listing legacy berstatus pending belum memiliki dokumen pengajuan kanonikal. Pemilik listing harus menarik listing ke draf terlebih dahulu melalui POST /api/pemilik/kos/:id/tarik, melengkapi data dan foto, lalu mengajukan ulang.',
     });
   } catch (error) {
     next(error);
@@ -93,6 +121,7 @@ const verifyKos = async (req, res, next) => {
 const getDashboardStats = async (req, res, next) => {
   try {
     const kosStats = await Kos.aggregate([
+      { $match: { deleted_at: null } },
       {
         $group: {
           _id: '$status_verifikasi',
@@ -127,6 +156,18 @@ const getDashboardStats = async (req, res, next) => {
       ringkasanKos.totalKamarTersedia += stat.totalKamarTersedia;
       ringkasanKos.totalKamarTotal += stat.totalKamarTotal;
     });
+
+    const activeOwners = await User.find({
+      $or: [{ status: 'active' }, { status: { $exists: false } }],
+    }).select('_id').lean();
+    const publicStats = await Kos.aggregate([
+      { $match: { ...getPublicVisibilityQuery(), pemilik_id: { $in: activeOwners.map(user => user._id) } } },
+      { $group: { _id: null, count: { $sum: 1 }, available: { $sum: '$jumlah_kamar_tersedia' }, total: { $sum: '$jumlah_kamar_total' } } },
+    ]);
+    ringkasanKos.approved = publicStats[0]?.count || 0;
+    ringkasanKos.totalKamarTersedia = publicStats[0]?.available || 0;
+    ringkasanKos.totalKamarTotal = publicStats[0]?.total || 0;
+    ringkasanKos.pending = await Pengajuan.countDocuments({ is_active: true, status: 'pending' });
 
     const ringkasanUser = {
       totalUsers: 0,
@@ -180,7 +221,7 @@ const getAllUsers = async (req, res, next) => {
 
 const exportKosCSV = async (req, res, next) => {
   try {
-    const dataKos = await Kos.find().populate('pemilik_id', 'nama email nomor_telepon');
+    const dataKos = await Kos.find({ deleted_at: null }).populate('pemilik_id', 'nama email nomor_telepon');
 
     let csv = 'ID,Nama Kos,Tipe,Harga Per Bulan,Kamar Tersedia,Kamar Total,Status Verifikasi,Area Kampus,Alamat,Nama Pemilik,Kontak Pemilik\n';
 

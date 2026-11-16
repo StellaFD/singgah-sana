@@ -1,5 +1,5 @@
 import type { ReactNode } from 'react';
-import { AlertCircle, Inbox, Info, CheckCircle2 } from 'lucide-react';
+import { AlertCircle, Inbox, Info, CheckCircle2, AlertTriangle } from 'lucide-react';
 import { cn } from '@/lib/owner/cn';
 import { Button } from './button';
 
@@ -49,12 +49,13 @@ export function ErrorState({ message, onRetry, className }: { message: string; o
   );
 }
 
-type AlertTone = 'info' | 'danger' | 'success';
+export type AlertTone = 'info' | 'danger' | 'success' | 'warning';
 
 const alertTones: Record<AlertTone, { box: string; Icon: typeof Info }> = {
   info: { box: 'bg-brand-soft text-brand', Icon: Info },
   danger: { box: 'bg-danger-soft text-danger', Icon: AlertCircle },
   success: { box: 'bg-success-soft text-success', Icon: CheckCircle2 },
+  warning: { box: 'bg-warning-soft text-warning border border-warning/20', Icon: AlertTriangle },
 };
 
 export function Alert({ tone = 'info', children, className }: { tone?: AlertTone; children: ReactNode; className?: string }) {

@@ -1,5 +1,6 @@
 const Inquiry = require('../models/Inquiry');
 const Kos = require('../models/Kos');
+const { isKosPubliclyVisible } = require('../utils/visibility');
 const { kirimNotifikasi } = require('../utils/notifikasi');
 
 const PESAN_INQUIRY_DUPLIKAT =
@@ -21,7 +22,7 @@ const sendInquiry = async (req, res, next) => {
       return res.status(404).json({ success: false, message: 'Kos tidak ditemukan' });
     }
 
-    if (kos.status_verifikasi !== 'approved' || kos.pemilik_id?.status === 'suspended') {
+    if (!isKosPubliclyVisible(kos)) {
       return res.status(400).json({
         success: false,
         message: 'Kos belum disetujui untuk publik sehingga belum dapat menerima pertanyaan',

@@ -1,44 +1,125 @@
 import type { BadgeTone } from '@/components/owner-ui/badge';
-import type { Kos } from './types';
+import type { Kos, StatusPublikasi } from './types';
 
-export type StatusKey = 'terbit' | 'ditinjau' | 'ditinjau_ulang' | 'perlu_revisi';
+export type StatusKey =
+  | 'terbit'
+  | 'ditinjau'
+  | 'ditinjau_ulang'
+  | 'perlu_revisi'
+  | 'ditolak'
+  | 'draf'
+  | 'ditangguhkan'
+  | 'diarsipkan';
 
-type StatusInfo = {
+export type StatusInfo = {
   key: StatusKey;
   label: string;
   tone: BadgeTone;
-  /** Penjelasan singkat di bawah nama kos pada daftar. */
   hint: string;
 };
 
-// Pesan yang ditulis backend saat pemilik mengubah data penting kos yang sudah ditinjau.
-const PENANDA_TINJAU_ULANG = 'menunggu verifikasi ulang';
-
-/**
- * Satu-satunya tempat pemetaan status backend -> label UI.
- * Backend sekarang: pending/approved/rejected. Jika model status dipisah (kontrak v1.2, bagian 5),
- * cukup fungsi ini yang diubah.
- */
-export function getKosStatus(kos: Pick<Kos, 'status_verifikasi' | 'catatan_verifikasi'>): StatusInfo {
-  switch (kos.status_verifikasi) {
-    case 'approved':
-      return { key: 'terbit', label: 'Terbit', tone: 'success', hint: 'Tampil di pencarian publik' };
-    case 'rejected':
-      return {
-        key: 'perlu_revisi',
-        label: 'Ditolak',
-        tone: 'danger',
-        hint: kos.catatan_verifikasi || 'Perlu diperbaiki sebelum ditinjau ulang',
-      };
-    case 'pending':
-    default:
-      if (kos.catatan_verifikasi?.toLowerCase().includes(PENANDA_TINJAU_ULANG)) {
-        return { key: 'ditinjau_ulang', label: 'Ditinjau ulang', tone: 'warning', hint: 'Perubahan menunggu peninjauan admin' };
-      }
-      return { key: 'ditinjau', label: 'Ditinjau', tone: 'neutral', hint: 'Menunggu peninjauan admin' };
+export function getKosStatus(
+  kos: {
+    status_verifikasi: Kos['status_verifikasi'];
+    catatan_verifikasi?: string | null;
+    status_publikasi?: StatusPublikasi;
+    status_moderasi?: Kos['status_moderasi'];
+    perubahan_tertunda?: Kos['perubahan_tertunda'];
+    deleted_at?: string | null;
   }
+): StatusInfo {
+  if (kos.deleted_at) {
+    return {
+      key: 'diarsipkan',
+      label: 'Dihapus',
+      tone: 'danger',
+      hint: 'Listing telah dihapus',
+    };
+  }
+
+  if (kos.status_moderasi === 'suspended') {
+    return { key: 'ditangguhkan', label: 'Ditangguhkan', tone: 'danger', hint: 'Disembunyikan dari publik oleh admin' };
+  }
+
+  if (kos.status_publikasi === 'archived') {
+    return {
+      key: 'diarsipkan',
+      label: 'Diarsipkan',
+      tone: 'neutral',
+      hint: 'Disembunyikan dari pencarian publik',
+    };
+  }
+
+  if (kos.status_verifikasi === 'approved') {
+    if (kos.perubahan_tertunda?.status === 'revision') {
+      return { key: 'perlu_revisi', label: 'Perubahan perlu revisi', tone: 'warning', hint: kos.perubahan_tertunda.catatan_verifikasi || 'Perbaiki perubahan sesuai catatan admin; versi terbit tetap aktif' };
+    }
+    if (kos.perubahan_tertunda?.status === 'rejected') {
+      return { key: 'ditolak', label: 'Perubahan ditolak', tone: 'danger', hint: kos.perubahan_tertunda.catatan_verifikasi || 'Perubahan ditolak; versi terbit tetap aktif' };
+    }
+    if (kos.perubahan_tertunda && kos.perubahan_tertunda.status === 'pending') {
+      return {
+        key: 'ditinjau_ulang',
+        label: 'Perubahan ditinjau',
+        tone: 'warning',
+        hint: 'Perubahan sedang ditinjau admin; versi terbit tetap aktif',
+      };
+    }
+    return {
+      key: 'terbit',
+      label: 'Terbit',
+      tone: 'success',
+      hint: 'Tampil di pencarian publik',
+    };
+  }
+
+  if (kos.status_verifikasi === 'revision') {
+    return {
+      key: 'perlu_revisi',
+      label: 'Perlu revisi',
+      tone: 'warning',
+      hint: kos.catatan_verifikasi || 'Perlu diperbaiki sesuai catatan admin sebelum diajukan ulang',
+    };
+  }
+
+  if (kos.status_verifikasi === 'rejected') {
+    return {
+      key: 'ditolak',
+      label: 'Ditolak',
+      tone: 'danger',
+      hint: kos.catatan_verifikasi || 'Pengajuan ditolak oleh admin',
+    };
+  }
+
+  if (kos.status_verifikasi === 'pending') {
+    return {
+      key: 'ditinjau',
+      label: 'Ditinjau',
+      tone: 'warning',
+      hint: 'Menunggu peninjauan admin',
+    };
+  }
+
+  if (kos.status_verifikasi === 'withdrawn') {
+    return {
+      key: 'draf',
+      label: 'Ditarik',
+      tone: 'neutral',
+      hint: 'Pengajuan ditarik kembali oleh pemilik',
+    };
+  }
+
+  // default / draft
+  return {
+    key: 'draf',
+    label: 'Draf',
+    tone: 'neutral',
+    hint: 'Draf belum diajukan ke admin',
+  };
 }
 
-export function isPublic(kos: Pick<Kos, 'status_verifikasi'>): boolean {
-  return kos.status_verifikasi === 'approved';
+export function isPublic(
+  kos: Pick<Kos, 'status_verifikasi'> & { status_publikasi?: StatusPublikasi; status_moderasi?: Kos['status_moderasi']; deleted_at?: string | null }
+): boolean {
+  return kos.status_verifikasi === 'approved' && kos.status_publikasi !== 'archived' && kos.status_moderasi !== 'suspended' && !kos.deleted_at;
 }

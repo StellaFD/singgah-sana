@@ -27,7 +27,7 @@ export function StepFasilitas({ form }: { form: KosForm }) {
           render={({ field }) => (
             <TagPicker
               id="fasilitas-baru"
-              value={field.value}
+              value={field.value ?? []}
               onChange={field.onChange}
               suggestions={FASILITAS_UMUM}
               placeholder="Fasilitas lain, misalnya Water heater"
@@ -51,7 +51,7 @@ export function StepFasilitas({ form }: { form: KosForm }) {
           render={({ field }) => (
             <TagPicker
               id="peraturan-baru"
-              value={field.value}
+              value={field.value ?? []}
               onChange={field.onChange}
               placeholder="Misalnya: Tamu lawan jenis dilarang menginap"
               maxLength={100}

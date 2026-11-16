@@ -44,18 +44,21 @@ const navigation = [
   { label: 'Semua kos', href: '/admin/kos', icon: Home },
   { label: 'Pengguna', href: '/admin/users', icon: Users },
   { label: 'Laporan', icon: Flag },
-  { label: 'Aktivitas', icon: Activity },
+  { label: 'Aktivitas', href: '/admin/audit-logs', icon: Activity },
 ] satisfies NavigationItem[];
 
 function NavigationItems({ onNavigate, pathname }: NavigationItemsProps) {
   return navigation.map((item) => {
     const Icon = item.icon;
     const isActive =
-      item.href === pathname || pathname.startsWith(`${item.href}/`);
+      Boolean(item.href) &&
+      (item.href === pathname || (item.href !== '/admin' && pathname.startsWith(`${item.href}/`)));
     const className = cn(
       'flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium',
       isActive
         ? 'bg-indigo-50 text-indigo-800'
+        : item.href
+        ? 'text-slate-600 hover:bg-slate-100 hover:text-slate-900'
         : 'cursor-not-allowed text-slate-400'
     );
 

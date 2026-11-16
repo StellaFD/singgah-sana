@@ -15,7 +15,7 @@ export function StepKamar({ form, editing }: { form: KosForm; editing: boolean }
           id="harga_per_bulan"
           label="Harga per bulan (Rp)"
           required
-          hint="Angka saja, minimal 100.000."
+          hint="Angka saja, minimal 1."
           error={errors.harga_per_bulan?.message}
         >
           <Input

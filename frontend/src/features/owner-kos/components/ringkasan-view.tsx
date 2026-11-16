@@ -12,7 +12,7 @@ import { formatRelativeShort } from '@/lib/owner/format';
 import { useSession } from '@/features/auth/use-session';
 import { useInquiryPemilik } from '@/features/owner-inquiry/hooks';
 import { useKosSaya } from '../hooks';
-import { getKosStatus } from '../status';
+import { getKosStatus, isPublic } from '../status';
 import { StatCard } from './stat-card';
 
 export function RingkasanView() {
@@ -22,13 +22,13 @@ export function RingkasanView() {
 
   const stats = useMemo(() => {
     const list = kos.data ?? [];
-    const terbit = list.filter((k) => k.status_verifikasi === 'approved');
+    const terbit = list.filter(isPublic);
     return {
       terbit: terbit.length,
       tersedia: terbit.reduce((sum, k) => sum + k.jumlah_kamar_tersedia, 0),
-      total: terbit.reduce((sum, k) => sum + k.jumlah_kamar_total, 0),
-      perluRevisi: list.filter((k) => k.status_verifikasi === 'rejected'),
-      ditinjau: list.filter((k) => k.status_verifikasi === 'pending').length,
+      total: terbit.reduce((sum, k) => sum + (k.jumlah_kamar_total ?? 0), 0),
+      perluRevisi: list.filter((k) => ['perlu_revisi', 'ditolak', 'ditangguhkan'].includes(getKosStatus(k).key)),
+      ditinjau: list.filter((k) => k.status_verifikasi === 'pending' || k.perubahan_tertunda?.status === 'pending').length,
     };
   }, [kos.data]);
 
