@@ -16,52 +16,83 @@ const Pengajuan = require('../models/Pengajuan');
 
 /**
  * Pengaman ketat: Tolak eksekusi jika terdeteksi URI non-demo atau cloud database.
+ * Hanya menerima host loopback lokal eksplisit dan nama database demo terisolasi.
  */
 function assertSafeDemoDatabase(uri) {
   if (!uri || typeof uri !== 'string') {
-    throw new Error('[Seeder Security Guard] URI database tidak terdefinisi.');
+    throw new Error('[Seeder Security Guard] DEMO_MONGO_URI tidak terdefinisi.');
   }
 
-  const normalized = uri.toLowerCase().trim();
+  // Parse URI secara struktural (menggunakan URL parser Node.js)
+  let parsedUrl;
+  try {
+    // Normalisasi protokol mongodb:// atau mongodb+srv:// agar dapat diparse oleh URL constructor
+    const httpEquiv = uri.replace(/^mongodb(?:\+srv)?:\/\//i, 'http://');
+    parsedUrl = new URL(httpEquiv);
+  } catch (err) {
+    throw new Error(`[Seeder Security Guard] Format URI database tidak valid: ${err.message}`);
+  }
 
-  // 1. Tolak mutlak MongoDB Atlas atau protokol SRV
-  if (normalized.includes('mongodb+srv://') || normalized.includes('.mongodb.net')) {
+  const hostname = (parsedUrl.hostname || '').toLowerCase().trim();
+  const rawPathname = (parsedUrl.pathname || '').replace(/^\//, '').trim();
+  const dbName = rawPathname.split('?')[0].toLowerCase().trim();
+
+  // 1. Tolak mutlak MongoDB Atlas, cloud SRV, atau host eksternal
+  if (uri.toLowerCase().includes('+srv') || hostname.includes('mongodb.net')) {
     throw new Error(
       '[Seeder Security Guard] DITOLAK: URI terdeteksi mengarah ke MongoDB Atlas/Cloud. Seeder dilarang keras menyentuh database non-lokal.'
     );
   }
 
-  // 2. Wajib host loopback lokal
-  const isLocalhost =
-    normalized.includes('127.0.0.1') ||
-    normalized.includes('localhost') ||
-    normalized.includes('::1');
-
-  if (!isLocalhost) {
+  // 2. Hanya izinkan host loopback lokal eksplisit
+  const allowedHostnames = new Set(['127.0.0.1', 'localhost', '::1', '[::1]']);
+  if (!allowedHostnames.has(hostname)) {
     throw new Error(
-      '[Seeder Security Guard] DITOLAK: Host database bukan loopback lokal (127.0.0.1 / localhost).'
+      `[Seeder Security Guard] DITOLAK: Host database "${hostname}" bukan loopback lokal yang diizinkan (${[...allowedHostnames].join(', ')}).`
     );
   }
 
-  // 3. Wajib nama database berlabel demo/test/dev
-  const safeDbNames = ['singgah_sana_db_demo', 'singgah_sana_demo', 'singgah_sana_dev', 'singgah_sana_db'];
-  const hasSafeDbName = safeDbNames.some((name) => normalized.includes(name));
-  if (!hasSafeDbName) {
+  // 3. Nama database harus eksplisit berakhiran '_demo' (contoh: singgah_sana_db_demo)
+  // Menolak tegas database generik seperti 'singgah_sana_db', 'admin', 'test', dsb.
+  const isExplicitDemoDb = dbName === 'singgah_sana_db_demo' || dbName === 'singgah_sana_demo';
+  if (!isExplicitDemoDb) {
     throw new Error(
-      `[Seeder Security Guard] DITOLAK: Nama database harus salah satu dari: ${safeDbNames.join(', ')}`
+      `[Seeder Security Guard] DITOLAK: Nama database "${dbName}" bukan database demo eksplisit (wajib "singgah_sana_db_demo" atau "singgah_sana_demo"). Database generik/utama dilarang disenggol seeder.`
     );
   }
 }
 
+/**
+ * Helper pembuatan/pembaruan akun pengguna simulasi:
+ * - Jika akun belum ada, buat via User.create() agar pre('save') hook membcrypt password secara benar.
+ * - Jika akun sudah ada, perbarui field profil saja TANPA mereset atau menimpa password yang ada.
+ */
+async function ensureDemoUser(userData) {
+  const existing = await User.findOne({ email: userData.email });
+  if (!existing) {
+    // Akun baru: User.create() memicu pre('save') hook bcrypt
+    return await User.create(userData);
+  }
+
+  // Akun sudah ada: jangan timpa password
+  existing.nama = userData.nama;
+  existing.nomor_telepon = userData.nomor_telepon;
+  existing.role = userData.role;
+  existing.foto_profil = userData.foto_profil;
+  return await existing.save();
+}
+
 const seedData = async () => {
   try {
-    const mongoUri = process.env.MONGO_URI || 'mongodb://127.0.0.1:27017/singgah_sana_db';
-    
-    // Periksa keamanan sebelum koneksi
-    assertSafeDemoDatabase(mongoUri);
+    // Gunakan environment variable terpisah DEMO_MONGO_URI
+    const demoMongoUri =
+      process.env.DEMO_MONGO_URI || 'mongodb://127.0.0.1:27017/singgah_sana_db_demo';
 
-    await mongoose.connect(mongoUri);
-    console.log('[Seeder] Terhubung ke database lokal aman...');
+    // Periksa keamanan struktural secara ketat sebelum membuka koneksi apa pun
+    assertSafeDemoDatabase(demoMongoUri);
+
+    await mongoose.connect(demoMongoUri);
+    console.log(`[Seeder] Terhubung ke database demo terisolasi: ${demoMongoUri}`);
 
     // Jangan menghapus secara default tanpa konfirmasi eksplisit dari environment variable khusus
     const allowClear = process.env.CONFIRM_DEMO_CLEAR === 'true';
@@ -76,60 +107,44 @@ const seedData = async () => {
       console.log('[Seeder] Mode non-destruktif: tidak menghapus data yang ada secara otomatis.');
     }
 
-    // 1. Akun Pengguna Simulasi (Menggunakan domain .invalid & kontak dummy aman)
-    const admin = await User.findOneAndUpdate(
-      { email: 'admin.demo@singgah-sana.invalid' },
-      {
-        nama: 'Admin Demo Simulasi',
-        email: 'admin.demo@singgah-sana.invalid',
-        password: 'AdminPassword123!',
-        nomor_telepon: '081200000001',
-        role: 'admin',
-        foto_profil: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=200&q=80',
-      },
-      { upsert: true, new: true }
-    );
+    // 1. Akun Pengguna Simulasi dengan Hashing Password yang Valid
+    const admin = await ensureDemoUser({
+      nama: 'Admin Demo Simulasi',
+      email: 'admin.demo@singgah-sana.invalid',
+      password: 'AdminPassword123!',
+      nomor_telepon: '081200000001',
+      role: 'admin',
+      foto_profil: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=200&q=80',
+    });
 
-    const pemilik1 = await User.findOneAndUpdate(
-      { email: 'pemilik1.demo@singgah-sana.invalid' },
-      {
-        nama: 'Pak Hendro (Simulasi Pemilik)',
-        email: 'pemilik1.demo@singgah-sana.invalid',
-        password: 'PemilikPassword123!',
-        nomor_telepon: '081200000002',
-        role: 'pemilik',
-        foto_profil: 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?auto=format&fit=crop&w=200&q=80',
-      },
-      { upsert: true, new: true }
-    );
+    const pemilik1 = await ensureDemoUser({
+      nama: 'Pak Hendro (Simulasi Pemilik)',
+      email: 'pemilik1.demo@singgah-sana.invalid',
+      password: 'PemilikPassword123!',
+      nomor_telepon: '081200000002',
+      role: 'pemilik',
+      foto_profil: 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?auto=format&fit=crop&w=200&q=80',
+    });
 
-    const pemilik2 = await User.findOneAndUpdate(
-      { email: 'pemilik2.demo@singgah-sana.invalid' },
-      {
-        nama: 'Ibu Ratna (Simulasi Pemilik)',
-        email: 'pemilik2.demo@singgah-sana.invalid',
-        password: 'PemilikPassword123!',
-        nomor_telepon: '081200000003',
-        role: 'pemilik',
-        foto_profil: 'https://images.unsplash.com/photo-1544005313-94ddf0286df2?auto=format&fit=crop&w=200&q=80',
-      },
-      { upsert: true, new: true }
-    );
+    const pemilik2 = await ensureDemoUser({
+      nama: 'Ibu Ratna (Simulasi Pemilik)',
+      email: 'pemilik2.demo@singgah-sana.invalid',
+      password: 'PemilikPassword123!',
+      nomor_telepon: '081200000003',
+      role: 'pemilik',
+      foto_profil: 'https://images.unsplash.com/photo-1544005313-94ddf0286df2?auto=format&fit=crop&w=200&q=80',
+    });
 
-    const pencari1 = await User.findOneAndUpdate(
-      { email: 'pencari1.demo@singgah-sana.invalid' },
-      {
-        nama: 'Dimas Wicaksono (Simulasi Pencari)',
-        email: 'pencari1.demo@singgah-sana.invalid',
-        password: 'PencariPassword123!',
-        nomor_telepon: '085700000001',
-        role: 'pencari',
-        foto_profil: 'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?auto=format&fit=crop&w=200&q=80',
-      },
-      { upsert: true, new: true }
-    );
+    const pencari1 = await ensureDemoUser({
+      nama: 'Dimas Wicaksono (Simulasi Pencari)',
+      email: 'pencari1.demo@singgah-sana.invalid',
+      password: 'PencariPassword123!',
+      nomor_telepon: '085700000001',
+      role: 'pencari',
+      foto_profil: 'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?auto=format&fit=crop&w=200&q=80',
+    });
 
-    console.log('[Seeder] Akun pengguna simulasi (.invalid) siap.');
+    console.log('[Seeder] Akun pengguna simulasi (.invalid) siap dan ter-hash aman.');
 
     // 2. Daftar Listing Kos Simulasi (Total 10: 8 Approved, 1 Pending dengan Pengajuan, 1 Rejected)
     // Sumber foto: Stok foto arsitektur/interior bebas royalti Unsplash untuk keperluan prototipe akademik.
@@ -398,6 +413,12 @@ const seedData = async () => {
           is_active: true,
           version: 1,
           base_version: 1,
+          nama_kos: pendingKos.nama,
+          submitted_at: new Date(),
+          catatan_verifikasi: null,
+          reviewed_at: null,
+          reviewed_by: null,
+          foto_ids: [],
           before: null,
           after: {
             nama: pendingKos.nama,
@@ -432,8 +453,13 @@ const seedData = async () => {
           is_active: false,
           version: 1,
           base_version: 1,
+          nama_kos: rejectedKos.nama,
+          submitted_at: new Date(Date.now() - 86400000),
+          catatan_verifikasi: rejectedKos.catatan_verifikasi,
+          reviewed_at: new Date(),
+          reviewed_by: admin._id,
+          foto_ids: [],
           before: null,
-          catatan_review: rejectedKos.catatan_verifikasi,
           after: {
             nama: rejectedKos.nama,
             deskripsi: rejectedKos.deskripsi,
@@ -451,6 +477,7 @@ const seedData = async () => {
         },
         { upsert: true }
       );
+      console.log('[Seeder] Dokumen Pengajuan kanonikal untuk listing rejected berhasil dikaitkan.');
     }
 
     // 5. Tambahkan Favorit contoh simulasi
