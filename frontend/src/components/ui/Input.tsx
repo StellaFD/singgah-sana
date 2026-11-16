@@ -42,7 +42,7 @@ const Input = React.forwardRef<HTMLInputElement, InputProps>(function Input(
           {label} {required && <span className="text-red-500">*</span>}
         </label>
       )}
-      <div className="relative rounded-lg shadow-sm">
+      <div className="relative rounded-xl shadow-sm">
         {leftIcon && (
           <div className="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none text-ink-muted">
             {leftIcon}
@@ -55,7 +55,7 @@ const Input = React.forwardRef<HTMLInputElement, InputProps>(function Input(
           aria-invalid={error ? true : undefined}
           aria-describedby={describedBy}
           className={`
-            block w-full rounded-lg border bg-white px-3.5 py-2.5 text-sm text-ink placeholder-ink-light
+            block w-full h-12 rounded-xl border bg-white px-3.5 text-sm text-ink placeholder-ink-light
             transition-colors duration-150 focus:outline-none focus:ring-2 focus:ring-brand-primary focus:border-brand-primary
             focus-visible:ring-2 focus-visible:ring-brand-primary focus-visible:border-brand-primary
             disabled:bg-surface-muted disabled:text-ink-muted disabled:cursor-not-allowed

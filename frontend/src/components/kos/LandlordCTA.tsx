@@ -5,20 +5,24 @@ import { useRouter } from 'next/navigation';
 import Button from '@/components/ui/Button';
 import Modal from '@/components/ui/Modal';
 import { useAuth } from '@/features/auth/AuthContext';
+import { safeInternalPath } from '@/lib/authRedirect';
 
 export default function LandlordCTA() {
   const auth = useAuth();
   const router = useRouter();
   const [modalOpen, setModalOpen] = useState(false);
+  const [isLoggingOut, setIsLoggingOut] = useState(false);
+
+  const targetPath = safeInternalPath('/pemilik/kos/baru') || '/pemilik';
 
   const handleClick = () => {
     if (!auth.isAuthenticated) {
-      router.push('/daftar?role=pemilik&next=' + encodeURIComponent('/pemilik/kos/baru'));
+      router.push('/daftar?role=pemilik&next=' + encodeURIComponent(targetPath));
       return;
     }
 
     if (auth.user?.role === 'pemilik') {
-      router.push('/pemilik/kos/baru');
+      router.push(targetPath);
       return;
     }
 
@@ -26,9 +30,18 @@ export default function LandlordCTA() {
     setModalOpen(true);
   };
 
-  const handleSwitchToOwnerLogin = () => {
-    setModalOpen(false);
-    router.push('/masuk?role=pemilik&next=' + encodeURIComponent('/pemilik/kos/baru'));
+  const handleSwitchToOwnerLogin = async () => {
+    setIsLoggingOut(true);
+    try {
+      // Keluar dari sesi peran saat ini secara eksplisit terlebih dahulu agar tidak terhalang GuestOnly
+      await auth.logout();
+    } catch {
+      // Abaikan jika sudah keluar
+    } finally {
+      setIsLoggingOut(false);
+      setModalOpen(false);
+      router.push('/masuk?role=pemilik&next=' + encodeURIComponent(targetPath));
+    }
   };
 
   const currentRoleLabel =
@@ -53,26 +66,36 @@ export default function LandlordCTA() {
         </Button>
       </section>
 
-      {/* Modal Pemisahan Peran Tunggal */}
+      {/* Modal Pemisahan Peran Tunggal dengan Konfirmasi Logout Eksplisit */}
       <Modal
         isOpen={modalOpen}
         onClose={() => setModalOpen(false)}
-        title="Pendaftaran Khusus Pemilik Kos"
+        title="Ganti ke Akun Pemilik Kos"
         description="Pemberitahuan Peran Akun"
       >
         <div className="space-y-4">
           <p className="text-sm text-ink leading-relaxed">
-            Akun Anda saat ini tercatat sebagai <strong>{currentRoleLabel}</strong>. Sistem Singgah Sana memisahkan peran akun secara terpisah agar hak akses dan data tetap aman.
+            Akun Anda saat ini tercatat sebagai <strong>{currentRoleLabel}</strong>. Sistem Singgah Sana menerapkan prinsip satu akun untuk satu peran demi menjaga keamanan data dan hak akses Anda.
           </p>
           <p className="text-sm text-ink-muted leading-relaxed">
-            Untuk mendaftarkan dan mempublikasikan kos baru, silakan masuk atau daftar menggunakan akun khusus pemilik kos.
+            Untuk mengelola atau mendaftarkan kos baru, Anda perlu keluar dari akun {currentRoleLabel} ini terlebih dahulu, lalu masuk menggunakan akun pemilik kos.
           </p>
           <div className="flex justify-end gap-2 pt-2">
-            <Button variant="secondary" size="sm" onClick={() => setModalOpen(false)}>
+            <Button
+              variant="secondary"
+              size="sm"
+              disabled={isLoggingOut}
+              onClick={() => setModalOpen(false)}
+            >
               Batal
             </Button>
-            <Button variant="primary" size="sm" onClick={handleSwitchToOwnerLogin}>
-              Masuk Akun Pemilik
+            <Button
+              variant="primary"
+              size="sm"
+              loading={isLoggingOut}
+              onClick={handleSwitchToOwnerLogin}
+            >
+              Keluar & Masuk Akun Pemilik
             </Button>
           </div>
         </div>

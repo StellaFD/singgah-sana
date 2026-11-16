@@ -54,14 +54,12 @@ export function MemberHeader() {
           { to: "/akun", label: "Ringkasan", external: false },
         ];
 
-  const brandHome =
-    user.role === "admin" ? "/admin" : user.role === "pemilik" ? "/pemilik" : "/akun";
   const roleLabel =
     user.role === "admin" ? "Administrator" : user.role === "pemilik" ? "Pemilik Kos" : "Pencari Kos";
 
   return (
     <header className="member-header">
-      <Link to={brandHome} aria-label={`Singgah Sana, beranda ${roleLabel}`} external={user.role !== "pencari"}>
+      <Link to="/" aria-label={`Singgah Sana, beranda utama publik (${roleLabel})`} external={true}>
         <Logo />
       </Link>
       <nav aria-label="Navigasi utama" className="main-nav">
