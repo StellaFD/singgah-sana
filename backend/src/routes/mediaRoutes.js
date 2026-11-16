@@ -4,6 +4,7 @@ const router = express.Router();
 const { uploadPhoto, deletePhoto } = require('../controllers/mediaController');
 const { protect } = require('../middlewares/authMiddleware');
 const { authorize } = require('../middlewares/roleMiddleware');
+const mediaRateLimit = require('../middlewares/mediaRateLimit');
 
 const memoryUpload = multer({
   storage: multer.memoryStorage(),
@@ -15,6 +16,7 @@ router.use(protect);
 router.post(
   '/',
   authorize('pemilik', 'admin'),
+  mediaRateLimit,
   memoryUpload.single('file'),
   uploadPhoto
 );

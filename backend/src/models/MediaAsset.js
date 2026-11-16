@@ -11,8 +11,8 @@ const mediaAssetSchema = new mongoose.Schema(
     storage_kind: {
       type: String,
       enum: {
-        values: ['local', 'legacy_remote'],
-        message: 'storage_kind harus "local" atau "legacy_remote"',
+        values: ['local', 'legacy_remote', 'cloudinary'],
+        message: 'storage_kind harus local, legacy_remote, atau cloudinary',
       },
       default: 'local',
       index: true,
@@ -29,6 +29,21 @@ const mediaAssetSchema = new mongoose.Schema(
         },
         message: 'Lokasi penyimpanan berkas lokal wajib diisi untuk media berjenis local',
       },
+    },
+    cloudinary_public_id: {
+      type: String,
+      default: null,
+      required: function () { return this.storage_kind === 'cloudinary'; },
+    },
+    cloudinary_asset_id: {
+      type: String,
+      default: null,
+      required: function () { return this.storage_kind === 'cloudinary'; },
+    },
+    cloudinary_cloud_name: {
+      type: String,
+      default: null,
+      required: function () { return this.storage_kind === 'cloudinary'; },
     },
     url: {
       type: String,
