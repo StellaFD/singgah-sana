@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Button, ButtonLink } from "../../components/ui/Button";
 import { Field } from "../../components/ui/Field";
 import { Alert, Spinner } from "../../components/ui/Feedback";
@@ -13,7 +13,65 @@ import { email, matches, password, required, type Schema } from "../../lib/valid
 import { AuthCard, StatusIcon } from "./AuthCard";
 import { useAuth } from "./AuthContext";
 import { ServiceUnavailablePage } from "./StatusPages";
+import { MemberOnly } from "./RouteGuards";
 import { authApi } from "./api";
+
+/**
+ * Hook bersama untuk membaca dan mengisolasi token aksi (reset sandi / verifikasi email).
+ * - Initial state: token = "" dan ready = false (konsisten antara server dan client untuk mencegah hydration mismatch).
+ * - Membaca fragment hash (#token=...) di client, dengan fallback query legacy (?token=...).
+ * - Dilindungi useRef `initializedRef` agar StrictMode replay tidak membersihkan token atau menimpa state.
+ * - Segera membersihkan URL di peramban via history.replaceState.
+ * - Tidak melakukan auto-POST di dalam effect.
+ */
+function useActionToken() {
+  const { query } = useLocation();
+  const [token, setToken] = useState<string>("");
+  const [ready, setReady] = useState<boolean>(false);
+  const tokenRef = useRef<string>("");
+  const initializedRef = useRef<boolean>(false);
+
+  useEffect(() => {
+    if (initializedRef.current) {
+      if (!ready && tokenRef.current) {
+        setToken(tokenRef.current);
+        setReady(true);
+      }
+      return;
+    }
+    initializedRef.current = true;
+
+    let foundToken = "";
+    if (typeof window !== "undefined") {
+      // 1. Prioritaskan fragment URI (#token=...) agar token tidak tercatat di log server
+      if (window.location.hash) {
+        const rawHash = window.location.hash.replace(/^#/, "");
+        if (rawHash.includes("token=")) {
+          const hashParams = new URLSearchParams(rawHash);
+          foundToken = (hashParams.get("token") || "").trim();
+        } else if (rawHash.length >= 32) {
+          foundToken = rawHash.trim();
+        }
+      }
+
+      // 2. Fallback baca dari query parameter (?token=...)
+      if (!foundToken) {
+        foundToken = (query.get("token") || "").trim();
+      }
+
+      // 3. Bersihkan token dari URL dan query browser segera setelah disimpan di memori
+      if (typeof window.history?.replaceState === "function") {
+        window.history.replaceState(null, "", window.location.pathname);
+      }
+    }
+
+    tokenRef.current = foundToken;
+    setToken(foundToken);
+    setReady(true);
+  }, [query, ready]);
+
+  return { token, ready };
+}
 
 /** Hitung mundur untuk tombol kirim ulang. */
 function useCooldown(seconds: number) {
@@ -75,15 +133,15 @@ export function ForgotPasswordPage() {
 function EnabledRecoverySentPage() {
   return (
     <AuthCard
-      title="Periksa kotak masukmu"
-      description="Jika email tersebut terdaftar, tautan pemulihan akan segera dikirim."
+      title="Permintaan pemulihan diterima"
+      description="Jika alamat email tersebut terdaftar dan valid, instruksi pemulihan akan segera dikirim. Periksa kotak masuk serta folder spam email kamu, dan coba lagi setelah satu menit jika belum menerima pesan."
     >
       <StatusIcon name="mail" />
       <ButtonLink to="/masuk" block>
         Kembali masuk
       </ButtonLink>
       <ButtonLink to="/lupa-sandi" variant="secondary" block>
-        Kirim ulang tautan
+        Kirim ulang permintaan
       </ButtonLink>
     </AuthCard>
   );
@@ -114,25 +172,46 @@ const resetSchema: Schema<RV> = {
 };
 
 function EnabledResetPasswordPage() {
-  const { query } = useLocation();
-  const token = query.get("token") ?? "";
+  const { token, ready } = useActionToken();
+  const { refresh, logout } = useAuth();
   const form = useForm<RV>({ password: "", konfirmasi: "" }, resetSchema);
-  useEffect(() => {
-    if (!token) navigate("/tautan-kedaluwarsa", { replace: true, force: true });
-  }, [token]);
 
   const onSubmit = form.submit(async (v) => {
     try {
       await authApi.resetPassword({ token, password: v.password });
+      // Reset mencabut semua sesi lama di backend; sinkronkan AuthContext agar sesi klien dianggap keluar:
+      if (typeof window !== "undefined") {
+        window.dispatchEvent(new Event("ss:auth-changed"));
+      }
+      try {
+        await logout("/reset-sandi/berhasil");
+      } catch {
+        await refresh();
+      }
       navigate("/reset-sandi/berhasil", { replace: true, force: true });
     } catch (e) {
       if (e instanceof ApiError && e.code === "TOKEN_EXPIRED") {
-        navigate("/tautan-kedaluwarsa", { replace: true, force: true });
+        navigate("/tautan-kedaluwarsa?type=reset", { replace: true, force: true });
         return;
       }
       throw e;
     }
   });
+
+  // Render loading netral sampai fragment token selesai dibaca di sisi klien
+  if (!ready) {
+    return (
+      <AuthCard title="Memeriksa tautan">
+        <Spinner label="Memeriksa tautan…" />
+      </AuthCard>
+    );
+  }
+
+  // Jika setelah siap token tidak ditemukan atau tidak valid, tampilkan halaman kedaluwarsa khusus reset
+  if (!token) {
+    return <LinkExpiredPage type="reset" />;
+  }
+
   return (
     <AuthCard
       title="Buat kata sandi baru"
@@ -145,7 +224,7 @@ function EnabledResetPasswordPage() {
         label="Kata sandi baru"
         type="password"
         autoComplete="new-password"
-        helper="Minimal 8 karakter, dengan huruf dan angka."
+        helper="Minimal 15 karakter dan maksimal 72 byte."
         {...form.field("password")}
       />
       <Field
@@ -200,25 +279,61 @@ export function PasswordSuccessPage() {
   return <EnabledPasswordSuccessPage />;
 }
 
-function EnabledLinkExpiredPage() {
-  const { user } = useAuth();
+function EnabledLinkExpiredPage({ type: propType }: { type?: "reset" | "verify" }) {
+  const { query } = useLocation();
+  const type = propType || (query.get("type") as "reset" | "verify" | null);
+
+  if (type === "reset") {
+    return (
+      <AuthCard
+        title="Tautan pemulihan kedaluwarsa"
+        description="Tautan pemulihan kata sandi ini tidak valid atau sudah kedaluwarsa (berlaku 30 menit)."
+      >
+        <StatusIcon name="clock" />
+        <ButtonLink to="/lupa-sandi" block>
+          Minta tautan pemulihan baru
+        </ButtonLink>
+        <ButtonLink to="/masuk" variant="secondary" block>
+          Kembali masuk
+        </ButtonLink>
+      </AuthCard>
+    );
+  }
+
+  if (type === "verify") {
+    return (
+      <AuthCard
+        title="Tautan verifikasi kedaluwarsa"
+        description="Tautan verifikasi email ini tidak valid atau sudah kedaluwarsa (berlaku 24 jam)."
+      >
+        <StatusIcon name="clock" />
+        <ButtonLink to="/verifikasi-email" block>
+          Minta tautan verifikasi baru
+        </ButtonLink>
+        <ButtonLink to="/masuk" variant="secondary" block>
+          Kembali masuk
+        </ButtonLink>
+      </AuthCard>
+    );
+  }
+
   return (
     <AuthCard
       title="Tautan sudah kedaluwarsa"
-      description="Minta tautan baru agar kamu dapat melanjutkan dengan aman."
+      description="Tautan pemulihan atau verifikasi email tidak valid atau sudah kedaluwarsa."
     >
       <StatusIcon name="clock" />
-      <ButtonLink
-        to={user && !user.emailTerverifikasi ? "/verifikasi-email" : "/lupa-sandi"}
-        block
-      >
-        Kirim tautan baru
+      <ButtonLink to="/lupa-sandi" block>
+        Pemulihan kata sandi
+      </ButtonLink>
+      <ButtonLink to="/verifikasi-email" variant="secondary" block>
+        Verifikasi email
       </ButtonLink>
     </AuthCard>
   );
 }
 
-export function LinkExpiredPage() {
+export function LinkExpiredPage({ type }: { type?: "reset" | "verify" } = {}) {
   if (!features.recovery && !features.emailVerification) {
     return (
       <ServiceUnavailablePage
@@ -227,12 +342,13 @@ export function LinkExpiredPage() {
       />
     );
   }
-  return <EnabledLinkExpiredPage />;
+  return <EnabledLinkExpiredPage type={type} />;
 }
 
 function EnabledVerifyEmailPendingPage() {
   const { user, refresh } = useAuth();
   const [checking, setChecking] = useState(false);
+  const [sent, setSent] = useState(false);
   const [notice, setNotice] = useState<{ tone: "success" | "error" | "info"; text: string } | null>(null);
   const cooldown = useCooldown(limits.resendCooldownSeconds);
   const [sending, setSending] = useState(false);
@@ -248,6 +364,7 @@ function EnabledVerifyEmailPendingPage() {
     setSending(true);
     try {
       await authApi.resendVerification();
+      setSent(true);
       cooldown.start();
       setNotice({ tone: "success", text: "Tautan verifikasi baru sudah dikirim. Cek kotak masuk dan folder spam." });
     } catch (e) {
@@ -257,23 +374,32 @@ function EnabledVerifyEmailPendingPage() {
     }
   };
 
+  const buttonLabel = !sent
+    ? "Kirim email verifikasi"
+    : cooldown.left > 0
+    ? `Kirim ulang email (${cooldown.left} dtk)`
+    : "Kirim ulang email";
+
   return (
     <AuthCard
-      title="Periksa emailmu"
+      title="Verifikasi alamat emailmu"
       description={
         <>
-          Kami mengirim tautan verifikasi ke <strong>{user?.email ?? "alamat emailmu"}</strong>.
+          Kirim tautan verifikasi ke <strong>{user?.email ?? "alamat emailmu"}</strong> untuk mengonfirmasi akunmu.
         </>
       }
     >
-      <Alert>Akunmu sudah dibuat. Verifikasi email untuk mengaktifkan seluruh fitur.</Alert>
-      <p className="auth-desc">Buka tautan pada email untuk melanjutkan. Belum menerima email? Periksa folder spam.</p>
+      <Alert>Akunmu sudah dibuat. Silakan verifikasi email untuk keamanan akunmu.</Alert>
+      <p className="auth-desc">Klik tombol di bawah untuk mengirimkan email verifikasi, lalu buka tautan pada email untuk menyelesaikan konfirmasi akun.</p>
       {notice && <Alert tone={notice.tone}>{notice.text}</Alert>}
-      <Button block onClick={check} loading={checking}>Saya sudah verifikasi</Button>
-      <Button variant="secondary" block onClick={resend} loading={sending} disabled={cooldown.left > 0}>
-        {cooldown.left > 0 ? `Kirim ulang email (${cooldown.left} dtk)` : "Kirim ulang email"}
+      <Button variant={sent ? "secondary" : "primary"} block onClick={resend} loading={sending} disabled={cooldown.left > 0}>
+        {buttonLabel}
       </Button>
-      <Link to="/daftar" className="link">Gunakan alamat email lain</Link>
+      {sent && (
+        <Button block onClick={check} loading={checking}>
+          Saya sudah verifikasi
+        </Button>
+      )}
     </AuthCard>
   );
 }
@@ -287,50 +413,79 @@ export function VerifyEmailPendingPage() {
       />
     );
   }
-  return <EnabledVerifyEmailPendingPage />;
+  return (
+    <MemberOnly>
+      <EnabledVerifyEmailPendingPage />
+    </MemberOnly>
+  );
 }
 
 function EnabledConfirmEmailPage() {
-  const { query } = useLocation();
-  const token = query.get("token") ?? "";
-  const { refresh } = useAuth();
-  const [state, setState] = useState<"loading" | "ok" | "expired" | "error">("loading");
+  const { token, ready } = useActionToken();
+  const { user, refresh } = useAuth();
+  const [submitting, setSubmitting] = useState(false);
+  const [state, setState] = useState<"prompt" | "ok" | "expired">("prompt");
   const [msg, setMsg] = useState("");
-  useEffect(() => {
+
+  // Tombol aksi eksplisit agar pemindai email (anti-spam / security preview) tidak mengonsumsi token secara sepihak
+  const handleConfirm = async () => {
     if (!token) {
       setState("expired");
       return;
     }
-    let live = true;
-    authApi.verifyEmail({ token }).then(
-      async () => {
-        await refresh();
-        if (live) setState("ok");
-      },
-      (e) => {
-        if (!live) return;
-        if (e instanceof ApiError && e.code === "TOKEN_EXPIRED") setState("expired");
-        else {
-          setMsg(errorMessage(e));
-          setState("error");
+
+    setSubmitting(true);
+    setMsg("");
+
+    try {
+      await authApi.verifyEmail({ token });
+      // Sinkronkan data jika pengguna saat ini sedang login
+      if (user) {
+        try {
+          await refresh();
+        } catch {
+          // Abaikan kesalahan sinkronisasi jika sesi tidak aktif
         }
       }
-    );
-    return () => {
-      live = false;
-    };
-  }, [token, refresh]);
+      setState("ok");
+    } catch (e) {
+      if (e instanceof ApiError && e.code === "TOKEN_EXPIRED") {
+        setState("expired");
+      } else {
+        setMsg(errorMessage(e));
+      }
+    } finally {
+      setSubmitting(false);
+    }
+  };
 
-  if (state === "loading") return <AuthCard title="Memverifikasi email"><Spinner label="Memeriksa tautan…" /></AuthCard>;
-  if (state === "expired") return <LinkExpiredPage />;
-  if (state === "error")
+  // Render loading netral sampai fragment token selesai dibaca di sisi klien
+  if (!ready) {
     return (
-      <AuthCard title="Verifikasi belum berhasil" description={msg}>
-        <StatusIcon name="circle-alert" />
-        <Button block onClick={() => location.reload()}>Coba lagi</Button>
+      <AuthCard title="Memeriksa tautan">
+        <Spinner label="Memeriksa tautan…" />
       </AuthCard>
     );
-  return <EmailVerifiedPage />;
+  }
+
+  if (!token || state === "expired") return <LinkExpiredPage type="verify" />;
+  if (state === "ok") return <EmailVerifiedPage />;
+
+  return (
+    <AuthCard
+      title="Konfirmasi Verifikasi Email"
+      description="Klik tombol di bawah ini untuk mengonfirmasi bahwa kamu adalah pemilik alamat email ini."
+    >
+      <StatusIcon name="mail" />
+      {msg && <Alert tone="error">{msg}</Alert>}
+      <Button block onClick={handleConfirm} loading={submitting}>
+        Konfirmasi & Verifikasi Email
+      </Button>
+      <Link to="/masuk" className="link">
+        Kembali masuk
+      </Link>
+    </AuthCard>
+  );
 }
 
 export function ConfirmEmailPage() {

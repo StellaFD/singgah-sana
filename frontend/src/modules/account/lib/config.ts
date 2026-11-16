@@ -35,10 +35,10 @@ export const features = {
   report: false,
   /** Kontak/inquiry saat kamar penuh belum diputuskan (K7). */
   inquiryWhenFull: true,
-  /** Layanan pemulihan kata sandi (lupa sandi / reset sandi) belum tersedia di backend */
-  recovery: false,
-  /** Layanan verifikasi email belum tersedia di backend */
-  emailVerification: false,
+  /** Layanan pemulihan kata sandi (lupa sandi / reset sandi) via Brevo SMTP */
+  recovery: true,
+  /** Layanan verifikasi email via Brevo SMTP */
+  emailVerification: true,
   /** Layanan penghapusan akun mandiri belum tersedia di backend */
   accountDeletion: false,
 } as const;

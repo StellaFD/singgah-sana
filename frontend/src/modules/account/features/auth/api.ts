@@ -31,9 +31,7 @@ export const authApi = {
     api.post<null>('/auth/reset-password', body),
 
   verifyEmail: (body: { token: string }) =>
-    api
-      .post<UserDto>('/auth/verify-email', body)
-      .then((r) => mapUser(r.data)),
+    api.post<null>('/auth/verify-email', body).then(() => undefined),
 
   resendVerification: () => api.post<null>('/auth/resend-verification'),
 };
