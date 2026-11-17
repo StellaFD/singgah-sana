@@ -1,6 +1,16 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
+import {
+  LayoutDashboard,
+  User as UserIcon,
+  KeyRound,
+  Bell as BellIcon,
+  LogOut,
+  Building,
+  Shield,
+  ClipboardCheck,
+} from "lucide-react";
 import { useAuth } from "../../features/auth/AuthContext";
 import { useLogoutRequest } from "../../features/auth/LogoutDialog";
 import { useSummary } from "../../features/account/SummaryContext";
@@ -85,19 +95,78 @@ export function MemberHeader() {
               <div className="menu-head">
                 <strong>{user.nama}</strong>
                 <span>{user.email}</span>
-                <span className="badge badge-brand" style={{ marginTop: 4 }}>{roleLabel}</span>
+                <span className="badge badge-brand" style={{ marginTop: 6, width: 'fit-content', fontSize: '10px', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
+                  {roleLabel}
+                </span>
               </div>
               <div className="menu-mobile-only">
                 {navItems.map((n) => (
                   <Link key={n.to} role="menuitem" to={n.to} external={n.external}>{n.label}</Link>
                 ))}
               </div>
-              {user.role === "pemilik" && <Link role="menuitem" to="/pemilik" external>Ruang pemilik</Link>}
-              {user.role === "admin" && <Link role="menuitem" to="/admin" external>Ruang admin</Link>}
-              <Link role="menuitem" to="/akun/profil">Profil</Link>
-              <Link role="menuitem" to="/akun/keamanan">Keamanan</Link>
-              <Link role="menuitem" to="/akun/notifikasi">Notifikasi</Link>
-              <button type="button" role="menuitem" onClick={() => { setOpen(false); requestLogout(); }}>Keluar</button>
+
+              {user.role === "pencari" && (
+                <Link role="menuitem" to="/akun" className="menu-item-with-icon">
+                  <LayoutDashboard size={16} />
+                  <span>Ringkasan Akun</span>
+                </Link>
+              )}
+
+              {user.role === "pemilik" && (
+                <>
+                  <Link role="menuitem" to="/pemilik" external className="menu-item-with-icon">
+                    <LayoutDashboard size={16} />
+                    <span>Ruang Pemilik</span>
+                  </Link>
+                  <Link role="menuitem" to="/pemilik/kos" external className="menu-item-with-icon">
+                    <Building size={16} />
+                    <span>Kos Saya</span>
+                  </Link>
+                </>
+              )}
+
+              {user.role === "admin" && (
+                <>
+                  <Link role="menuitem" to="/admin" external className="menu-item-with-icon">
+                    <Shield size={16} />
+                    <span>Ruang Admin</span>
+                  </Link>
+                  <Link role="menuitem" to="/admin/review" external className="menu-item-with-icon">
+                    <ClipboardCheck size={16} />
+                    <span>Peninjauan</span>
+                  </Link>
+                </>
+              )}
+
+              <Link role="menuitem" to="/akun/profil" className="menu-item-with-icon">
+                <UserIcon size={16} />
+                <span>Pengaturan Profil</span>
+              </Link>
+
+              <Link role="menuitem" to="/akun/keamanan" className="menu-item-with-icon">
+                <KeyRound size={16} />
+                <span>Kata Sandi & Keamanan</span>
+              </Link>
+
+              <Link role="menuitem" to="/akun/notifikasi" className="menu-item-with-icon">
+                <BellIcon size={16} />
+                <span>Pemberitahuan & Notifikasi</span>
+              </Link>
+
+              <div className="menu-divider" />
+
+              <button
+                type="button"
+                role="menuitem"
+                className="menu-item-with-icon menu-item-danger"
+                onClick={() => {
+                  setOpen(false);
+                  requestLogout();
+                }}
+              >
+                <LogOut size={16} />
+                <span>Keluar dari Akun</span>
+              </button>
             </div>
           )}
         </div>

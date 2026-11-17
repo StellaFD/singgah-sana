@@ -160,12 +160,50 @@
 .account-module .req { color: var(--color-danger-fg); }
 .account-module .control {
   width: 100%; min-height: 56px; padding: 14px 16px;
-  border: 1px solid var(--color-line-strong); border-radius: var(--radius-sm);
+  border: 1.5px solid #94a3b8; border-radius: var(--radius-sm);
   background: var(--c-surface); color: var(--c-ink); font-size: 16px; line-height: 24px;
+  box-shadow: 0 1px 2px 0 rgba(0, 0, 0, 0.04);
+  transition: border-color .15s ease, box-shadow .15s ease;
 }
+.account-module .control:hover { border-color: #64748b; }
 .account-module .control::placeholder { color: #6b7a90; }
 .account-module .control-area { min-height: 120px; resize: vertical; }
 .account-module .control:focus { outline: none; border-color: var(--c-brand); box-shadow: 0 0 0 3px var(--c-brand-ring); }
+.account-module select,
+.account-module select.control,
+.account-module .field select {
+  width: 100%;
+  min-height: 56px;
+  padding: 14px 48px 14px 16px;
+  border: 1.5px solid #94a3b8;
+  border-radius: var(--radius-sm);
+  background-color: var(--c-surface, #ffffff);
+  color: var(--c-ink);
+  font-size: 16px;
+  line-height: 24px;
+  cursor: pointer;
+  appearance: none;
+  -webkit-appearance: none;
+  -moz-appearance: none;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='20' height='20' viewBox='0 0 24 24' fill='none' stroke='%23334155' stroke-width='2.5' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m6 9 6 6 6-6'/%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: right 16px center;
+  background-size: 18px 18px;
+  box-shadow: 0 1px 2px 0 rgba(0, 0, 0, 0.04);
+  transition: border-color .15s ease, box-shadow .15s ease;
+}
+.account-module select:hover,
+.account-module select.control:hover,
+.account-module .field select:hover {
+  border-color: #64748b;
+}
+.account-module select:focus,
+.account-module select.control:focus,
+.account-module .field select:focus {
+  outline: none;
+  border-color: var(--c-brand);
+  box-shadow: 0 0 0 3px var(--c-brand-ring);
+}
 .account-module .field-error .control, .account-module .control[aria-invalid="true"] { border-color: var(--color-danger-line); }
 .account-module .field-note { font-size: 12px; line-height: 18px; color: var(--c-muted); }
 .account-module .field-note-error { color: var(--color-danger-fg); font-size: 13px; }
@@ -280,10 +318,33 @@
   background: var(--c-brand); color: #fff; font-size: 11px; line-height: 18px; text-align: center; font-weight: 600;
 }
 .account-module .menu-wrap { position: relative; }
-.account-module .account-trigger { display: flex; align-items: center; gap: 10px; border: 0; background: transparent; padding: 4px 8px 4px 4px; border-radius: var(--radius-pill); min-height: 44px; }
-.account-module .account-trigger:hover { background: var(--c-surface-muted); }
+.account-module .account-trigger {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  border: 1px solid var(--color-brand-200);
+  background: transparent;
+  padding: 4px 14px 4px 4px;
+  border-radius: var(--radius-pill);
+  min-height: 48px;
+  cursor: pointer;
+  transition: all .15s ease;
+}
+.account-module .account-trigger:hover {
+  border-color: var(--color-brand-600);
+  background: var(--c-brand-soft);
+}
+.account-module .account-name {
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--c-ink);
+  max-width: 140px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
 .account-module .menu {
-  position: absolute; right: 0; top: calc(100% + 8px); z-index: 60; width: 240px; padding: 8px;
+  position: absolute; right: 0; top: calc(100% + 8px); z-index: 60; width: 260px; padding: 8px;
   display: flex; flex-direction: column; gap: 2px; background: var(--c-surface);
   border: 1px solid var(--c-line); border-radius: var(--radius-md); box-shadow: var(--shadow-overlay);
 }
@@ -292,6 +353,44 @@
 .account-module .menu-head { padding: 8px 12px 10px; display: flex; flex-direction: column; border-bottom: 1px solid var(--c-line); margin-bottom: 4px; overflow-wrap: anywhere; }
 .account-module .menu-head span { color: var(--c-muted); font-size: 12px; }
 .account-module .menu-mobile-only { display: none; flex-direction: column; border-bottom: 1px solid var(--c-line); padding-bottom: 4px; margin-bottom: 4px; }
+.account-module .menu-item-with-icon {
+  display: flex !important;
+  align-items: center;
+  gap: 10px;
+  font-size: 12px !important;
+  font-weight: 500;
+  color: var(--c-ink);
+  padding: 8px 12px !important;
+  border-radius: 8px;
+  transition: all .15s ease;
+}
+.account-module .menu-item-with-icon:hover {
+  background: var(--c-brand-soft) !important;
+  color: var(--c-brand) !important;
+}
+.account-module .menu-item-with-icon svg {
+  color: var(--c-muted);
+  flex-shrink: 0;
+}
+.account-module .menu-item-with-icon:hover svg {
+  color: var(--c-brand);
+}
+.account-module .menu-item-danger {
+  color: #dc2626 !important;
+  font-weight: 600 !important;
+}
+.account-module .menu-item-danger:hover {
+  background: #fef2f2 !important;
+  color: #b91c1c !important;
+}
+.account-module .menu-item-danger svg {
+  color: #ef4444 !important;
+}
+.account-module .menu-divider {
+  height: 1px;
+  background: var(--c-line);
+  margin: 4px 0;
+}
 
 /* ---------- Footer ---------- */
 .account-module .site-footer {
@@ -308,13 +407,148 @@
 }
 .account-module .auth-main-single { grid-template-columns: minmax(0, 520px); }
 .account-module .auth-story {
-  min-height: 560px; border-radius: var(--radius-lg); background: var(--c-brand-soft); padding: 32px;
-  display: flex; flex-direction: column; justify-content: flex-end; gap: 16px;
+  min-height: 560px;
+  border-radius: var(--radius-lg);
+  background: linear-gradient(165deg, #f5f3ff 0%, #ede9fe 50%, #f3e8ff 100%);
+  padding: 32px;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  gap: 24px;
+  border: 1px solid var(--color-brand-100);
+  box-shadow: 0 4px 20px rgba(124, 58, 237, 0.05);
 }
-.account-module .story-title { font-size: 32px; line-height: 40px; }
-.account-module .auth-story p { color: var(--c-muted); }
-.account-module .auth-story ul { display: grid; gap: 12px; font-size: 14px; margin-top: 8px; }
-.account-module .auth-story li { display: flex; align-items: center; gap: 12px; }
+
+.account-module .story-graphic-wrap {
+  position: relative;
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
+
+.account-module .story-image-card {
+  position: relative;
+  width: 100%;
+  height: 220px;
+  border-radius: 18px;
+  overflow: hidden;
+  box-shadow: 0 12px 28px -6px rgba(124, 58, 237, 0.2), 0 4px 12px -2px rgba(0, 0, 0, 0.06);
+  border: 2px solid #ffffff;
+}
+
+.account-module .story-main-img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+}
+
+.account-module .story-image-overlay {
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(180deg, rgba(15, 23, 42, 0.05) 0%, rgba(15, 23, 42, 0.45) 100%);
+}
+
+.account-module .story-badge {
+  position: absolute;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 12px;
+  border-radius: 999px;
+  font-size: 12px;
+  font-weight: 600;
+  background: rgba(255, 255, 255, 0.95);
+  backdrop-filter: blur(8px);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.12);
+}
+
+.account-module .story-badge-top {
+  top: 12px;
+  left: 12px;
+  color: #1e1b4b;
+}
+
+.account-module .story-badge-star {
+  color: #f59e0b;
+  font-size: 14px;
+  line-height: 1;
+}
+
+.account-module .story-badge-bottom {
+  bottom: 12px;
+  right: 12px;
+  color: #5b21b6;
+}
+
+.account-module .story-badge-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: #10b981;
+}
+
+.account-module .story-floating-card {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  background: #ffffff;
+  border: 1px solid var(--color-brand-100);
+  border-radius: 14px;
+  padding: 10px 14px;
+  box-shadow: 0 10px 24px -4px rgba(15, 23, 42, 0.1);
+  margin-top: -24px;
+  z-index: 2;
+  width: 90%;
+  backdrop-filter: blur(8px);
+}
+
+.account-module .story-card-avatar {
+  width: 38px;
+  height: 38px;
+  border-radius: 10px;
+  background: #ede9fe;
+  color: #7c3aed;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 18px;
+  flex-shrink: 0;
+}
+
+.account-module .story-card-content {
+  flex: 1;
+  min-width: 0;
+}
+
+.account-module .story-card-title {
+  font-size: 13px;
+  font-weight: 600;
+  color: #0f172a;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.account-module .story-card-sub {
+  font-size: 11px;
+  color: #64748b;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.account-module .story-text-group {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.account-module .story-title { font-size: 28px; line-height: 36px; color: #0f172a; }
+.account-module .auth-story p { color: var(--c-muted); font-size: 14px; line-height: 22px; }
+.account-module .auth-story ul { display: grid; gap: 10px; font-size: 13.5px; margin-top: 4px; }
+.account-module .auth-story li { display: flex; align-items: center; gap: 10px; color: #334155; }
 .account-module .story-icon { color: var(--c-brand); display: grid; place-items: center; }
 .account-module .auth-card {
   border: 1px solid var(--c-line); border-radius: var(--radius-lg); padding: 32px;
@@ -460,4 +694,191 @@
   .account-module .dialog-actions { grid-template-columns: 1fr; }
   .account-module .dialog-actions .btn:first-child { order: 2; }
   .account-module .send-row .btn { min-width: 0; }
+}
+
+/* ---------- Google Auth & Role Selector ---------- */
+.account-module .google-auth-wrapper {
+  width: 100%;
+  display: flex;
+  justify-content: center;
+}
+
+.account-module .google-auth-fallback-btn {
+  width: 100%;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  height: 44px;
+  padding: 0 16px;
+  background: var(--c-surface);
+  border: 1px solid var(--c-line-strong);
+  border-radius: var(--radius-sm);
+  color: var(--c-ink);
+  font-size: 14px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: background-color 0.15s ease, border-color 0.15s ease, box-shadow 0.15s ease;
+}
+
+.account-module .google-auth-fallback-btn:hover:not(:disabled) {
+  background: var(--c-surface-muted);
+  border-color: #94a3b8;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.08);
+}
+
+.account-module .auth-divider {
+  display: flex;
+  align-items: center;
+  text-align: center;
+  margin: 4px 0;
+  color: var(--c-muted);
+  font-size: 13px;
+}
+
+.account-module .auth-divider::before,
+.account-module .auth-divider::after {
+  content: "";
+  flex: 1;
+  border-bottom: 1px solid var(--c-line);
+}
+
+.account-module .auth-divider span {
+  padding: 0 12px;
+}
+
+.account-module .role-selector-group {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+  background: var(--c-surface-muted);
+  padding: 4px;
+  border-radius: var(--radius-md);
+  border: 1px solid var(--c-line);
+}
+
+.account-module .role-pill-btn {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 14px;
+  border-radius: 12px;
+  border: 1px solid transparent;
+  background: transparent;
+  color: var(--c-muted);
+  cursor: pointer;
+  text-align: left;
+  transition: all 0.2s ease;
+}
+
+.account-module .role-pill-btn:hover {
+  color: var(--c-ink);
+}
+
+.account-module .role-pill-btn.active {
+  background: var(--c-surface);
+  color: var(--c-brand);
+  border-color: var(--c-brand-ring);
+  box-shadow: 0 2px 8px rgba(124, 58, 237, 0.08);
+}
+
+.account-module .role-pill-icon {
+  font-size: 20px;
+  line-height: 1;
+}
+
+.account-module .role-pill-text strong {
+  display: block;
+  font-size: 14px;
+  font-weight: 600;
+  color: inherit;
+}
+
+.account-module .role-pill-text small {
+  display: block;
+  font-size: 12px;
+  color: var(--c-muted);
+}
+
+.account-module .role-options-grid {
+  display: grid;
+  gap: 12px;
+  margin-top: 16px;
+}
+
+.account-module .role-option-card {
+  display: flex;
+  align-items: flex-start;
+  gap: 16px;
+  padding: 16px;
+  border: 1.5px solid var(--c-line);
+  border-radius: var(--radius-md);
+  background: var(--c-surface);
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.account-module .role-option-card:hover {
+  border-color: var(--c-brand-ring);
+  background: var(--c-brand-soft);
+}
+
+.account-module .role-option-card.active {
+  border-color: var(--c-brand);
+  background: var(--c-brand-soft);
+  box-shadow: 0 0 0 1px var(--c-brand);
+}
+
+.account-module .role-card-icon {
+  font-size: 24px;
+  line-height: 1;
+}
+
+.account-module .role-card-info {
+  flex: 1;
+}
+
+.account-module .role-card-info h4 {
+  font-size: 15px;
+  font-weight: 600;
+  margin-bottom: 4px;
+  color: var(--c-ink);
+}
+
+.account-module .role-card-info p {
+  font-size: 13px;
+  color: var(--c-muted);
+  line-height: 1.4;
+}
+
+.account-module .role-card-radio {
+  display: flex;
+  align-items: center;
+  padding-top: 2px;
+}
+
+.account-module .custom-radio {
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  border: 2px solid var(--c-line-strong);
+  display: inline-block;
+  position: relative;
+  transition: all 0.15s ease;
+}
+
+.account-module .custom-radio.checked {
+  border-color: var(--c-brand);
+  background: var(--c-brand);
+}
+
+.account-module .custom-radio.checked::after {
+  content: "";
+  position: absolute;
+  top: 4px;
+  left: 4px;
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: white;
 }

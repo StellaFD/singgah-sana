@@ -21,7 +21,28 @@ export function KetersediaanView({ id }: { id: string }) {
   const { data: kos, error, loading, reload } = useKos(id);
 
   if (loading) return <Spinner label="Memuat data kos…" />;
-  if (error || !kos) return <ErrorState message={error ?? 'Kos tidak ditemukan.'} onRetry={reload} />;
+  if (error || !kos) {
+    return (
+      <ErrorState
+        message={error ?? 'Kos tidak ditemukan atau Anda tidak memiliki akses ke properti ini.'}
+        onRetry={reload}
+        action={
+          <div className="flex items-center justify-center gap-3">
+            <button
+              type="button"
+              onClick={reload}
+              className="rounded-lg border border-line px-4 py-2 text-sm font-medium text-ink hover:bg-surface-muted"
+            >
+              Coba lagi
+            </button>
+            <ButtonLink href="/pemilik/kos" variant="primary" size="sm">
+              Kembali ke Kos Saya
+            </ButtonLink>
+          </div>
+        }
+      />
+    );
+  }
 
   return (
     <>

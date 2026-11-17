@@ -133,15 +133,15 @@ export function ForgotPasswordPage() {
 function EnabledRecoverySentPage() {
   return (
     <AuthCard
-      title="Permintaan pemulihan diterima"
-      description="Jika alamat email tersebut terdaftar dan valid, instruksi pemulihan akan segera dikirim. Periksa kotak masuk serta folder spam email kamu, dan coba lagi setelah satu menit jika belum menerima pesan."
+      title="Periksa kotak masukmu"
+      description="Jika email tersebut terdaftar, tautan pemulihan akan segera dikirim."
     >
       <StatusIcon name="mail" />
       <ButtonLink to="/masuk" block>
         Kembali masuk
       </ButtonLink>
       <ButtonLink to="/lupa-sandi" variant="secondary" block>
-        Kirim ulang permintaan
+        Kirim ulang tautan
       </ButtonLink>
     </AuthCard>
   );
@@ -224,7 +224,7 @@ function EnabledResetPasswordPage() {
         label="Kata sandi baru"
         type="password"
         autoComplete="new-password"
-        helper="Minimal 15 karakter dan maksimal 72 byte."
+        helper="Minimal 8 karakter. Boleh menggunakan huruf, angka, dan simbol."
         {...form.field("password")}
       />
       <Field
@@ -348,7 +348,6 @@ export function LinkExpiredPage({ type }: { type?: "reset" | "verify" } = {}) {
 function EnabledVerifyEmailPendingPage() {
   const { user, refresh } = useAuth();
   const [checking, setChecking] = useState(false);
-  const [sent, setSent] = useState(false);
   const [notice, setNotice] = useState<{ tone: "success" | "error" | "info"; text: string } | null>(null);
   const cooldown = useCooldown(limits.resendCooldownSeconds);
   const [sending, setSending] = useState(false);
@@ -364,7 +363,6 @@ function EnabledVerifyEmailPendingPage() {
     setSending(true);
     try {
       await authApi.resendVerification();
-      setSent(true);
       cooldown.start();
       setNotice({ tone: "success", text: "Tautan verifikasi baru sudah dikirim. Cek kotak masuk dan folder spam." });
     } catch (e) {
@@ -374,32 +372,23 @@ function EnabledVerifyEmailPendingPage() {
     }
   };
 
-  const buttonLabel = !sent
-    ? "Kirim email verifikasi"
-    : cooldown.left > 0
-    ? `Kirim ulang email (${cooldown.left} dtk)`
-    : "Kirim ulang email";
-
   return (
     <AuthCard
-      title="Verifikasi alamat emailmu"
+      title="Periksa emailmu"
       description={
         <>
-          Kirim tautan verifikasi ke <strong>{user?.email ?? "alamat emailmu"}</strong> untuk mengonfirmasi akunmu.
+          Kami mengirim tautan verifikasi ke <strong>{user?.email ?? "alamat emailmu"}</strong>.
         </>
       }
     >
       <Alert>Akunmu sudah dibuat. Silakan verifikasi email untuk keamanan akunmu.</Alert>
-      <p className="auth-desc">Klik tombol di bawah untuk mengirimkan email verifikasi, lalu buka tautan pada email untuk menyelesaikan konfirmasi akun.</p>
+      <p className="auth-desc">Buka tautan pada email untuk melanjutkan. Belum menerima email? Periksa folder spam.</p>
       {notice && <Alert tone={notice.tone}>{notice.text}</Alert>}
-      <Button variant={sent ? "secondary" : "primary"} block onClick={resend} loading={sending} disabled={cooldown.left > 0}>
-        {buttonLabel}
+      <Button block onClick={check} loading={checking}>Saya sudah verifikasi</Button>
+      <Button variant="secondary" block onClick={resend} loading={sending} disabled={cooldown.left > 0}>
+        {cooldown.left > 0 ? `Kirim ulang email (${cooldown.left} dtk)` : "Kirim ulang email"}
       </Button>
-      {sent && (
-        <Button block onClick={check} loading={checking}>
-          Saya sudah verifikasi
-        </Button>
-      )}
+      <Link to="/daftar" className="link">Gunakan alamat email lain</Link>
     </AuthCard>
   );
 }

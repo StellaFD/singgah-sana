@@ -29,6 +29,10 @@ if (process.env.NODE_ENV !== 'test') {
 app.use('/uploads', express.static(path.join(__dirname, '../uploads')));
 
 // Health check & Info Root
+app.get('/', (req, res) => {
+  res.redirect('/api');
+});
+
 app.get('/api', (req, res) => {
   res.status(200).json({
     success: true,

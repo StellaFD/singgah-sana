@@ -68,15 +68,26 @@ export default function KosGrid({
             {error}
           </p>
         </div>
-        {onRetry && (
-          <button
-            type="button"
-            onClick={onRetry}
-            className="px-5 py-2.5 rounded-lg bg-brand-primary text-white text-sm font-medium hover:bg-brand-hover transition-colors cursor-pointer"
-          >
-            Coba Lagi
-          </button>
-        )}
+        <div className="flex flex-wrap items-center justify-center gap-3">
+          {onRetry && (
+            <button
+              type="button"
+              onClick={onRetry}
+              className="px-5 py-2.5 rounded-lg bg-brand-primary text-white text-sm font-medium hover:bg-brand-hover transition-colors cursor-pointer"
+            >
+              Coba Lagi
+            </button>
+          )}
+          {onResetFilters && (
+            <button
+              type="button"
+              onClick={onResetFilters}
+              className="px-5 py-2.5 rounded-lg border border-surface-border bg-white text-ink text-sm font-medium hover:bg-surface-subtle transition-colors cursor-pointer"
+            >
+              Atur Ulang Pencarian
+            </button>
+          )}
+        </div>
       </div>
     );
   }

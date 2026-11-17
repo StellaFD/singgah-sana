@@ -29,7 +29,17 @@ export function EmptyState({ title, description, action, icon, className }: Empt
   );
 }
 
-export function ErrorState({ message, onRetry, className }: { message: string; onRetry?: () => void; className?: string }) {
+export function ErrorState({
+  message,
+  onRetry,
+  action,
+  className,
+}: {
+  message: string;
+  onRetry?: () => void;
+  action?: ReactNode;
+  className?: string;
+}) {
   return (
     <div
       role="alert"
@@ -40,7 +50,9 @@ export function ErrorState({ message, onRetry, className }: { message: string; o
     >
       <AlertCircle className="h-8 w-8 text-danger" aria-hidden />
       <p className="max-w-md text-sm font-medium text-danger">{message}</p>
-      {onRetry ? (
+      {action ? (
+        <div className="mt-2">{action}</div>
+      ) : onRetry ? (
         <Button variant="secondary" size="sm" onClick={onRetry}>
           Coba lagi
         </Button>

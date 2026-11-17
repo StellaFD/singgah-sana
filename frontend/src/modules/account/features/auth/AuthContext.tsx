@@ -14,6 +14,13 @@ export function useAuth() {
     user: shared.user ? mapUser({...shared.user, _id:shared.user.id}) : null,
     signOutTarget,
     login: async (body: {email:string; password:string}) => { const user=await authApi.login(body); await shared.refresh(); return user; },
+    googleAuth: async (body: {credential:string; role?: 'pencari' | 'pemilik'}) => {
+      const result = await authApi.googleAuth(body);
+      if (result.type === 'success') {
+        await shared.refresh();
+      }
+      return result;
+    },
     register: async (body: Parameters<typeof authApi.register>[0]) => { const user=await authApi.register(body); await shared.refresh(); return user; },
     logout: async (to='/masuk') => { await shared.logout(); setSignOutTarget(to); },
     clear: (to='/masuk') => { setSignOutTarget(to); void shared.refresh(); },

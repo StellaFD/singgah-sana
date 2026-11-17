@@ -5,6 +5,8 @@ import { Button } from "../../components/ui/Button";
 import { Checkbox, Field } from "../../components/ui/Field";
 import { Alert } from "../../components/ui/Feedback";
 import { Link } from "../../components/ui/Link";
+import { GoogleAuthButton } from "../../components/ui/GoogleAuthButton";
+import { ApiError } from "../../lib/api/client";
 import { externalPaths } from "../../lib/config";
 import { useForm } from "../../lib/hooks/useForm";
 import { navigate, useLocation } from "../../lib/router";
@@ -14,6 +16,7 @@ import { useAuth } from "./AuthContext";
 import {
   resolvePostAuthRedirect,
   buildAuthLink,
+  safeInternalPath,
 } from "@/lib/authRedirect";
 
 interface V extends Record<string, string> {
@@ -33,7 +36,7 @@ const schema: Schema<V> = {
 };
 
 export default function RegisterPage() {
-  const { register } = useAuth();
+  const { register, googleAuth } = useAuth();
   const { query } = useLocation();
 
   const nextParam = query.get("next");
@@ -43,9 +46,40 @@ export default function RegisterPage() {
   const initialRole: "pencari" | "pemilik" = rawRole === "pemilik" ? "pemilik" : "pencari";
   const [role, setRole] = useState<"pencari" | "pemilik">(initialRole);
 
+  const [googleLoading, setGoogleLoading] = useState(false);
+  const [googleError, setGoogleError] = useState<string | null>(null);
+
   const form = useForm<V>({ nama: "", email: "", telepon: "", password: "", konfirmasi: "" }, schema);
   const [agree, setAgree] = useState(false);
   const [agreeError, setAgreeError] = useState<string>();
+
+  const handleGoogleRegister = async (credential: string) => {
+    try {
+      setGoogleLoading(true);
+      setGoogleError(null);
+      const result = await googleAuth({ credential, role });
+      if (result.type === "success") {
+        let target = resolvePostAuthRedirect(result.user.role, nextParam);
+        if (nextParam && target !== nextParam && safeInternalPath(nextParam)) {
+          const separator = target.includes("?") ? "&" : "?";
+          target = `${target}${separator}redirect_notice=role_mismatch`;
+        }
+        navigate(target, { replace: true, force: true });
+      }
+    } catch (e) {
+      if (e instanceof ApiError && e.code === "ACCOUNT_SUSPENDED") {
+        navigate("/dibatasi", { replace: true, force: true });
+        return;
+      }
+      setGoogleError(
+        e instanceof Error
+          ? e.message
+          : "Gagal mendaftar dengan Google. Silakan coba lagi."
+      );
+    } finally {
+      setGoogleLoading(false);
+    }
+  };
 
   const onSubmit = form.submit(async (v) => {
     if (!agree) {
@@ -82,16 +116,58 @@ export default function RegisterPage() {
         </Alert>
       )}
       {form.formError && <Alert tone="error">{form.formError}</Alert>}
-      <label className="field">
-        Peran akun
-        <select
-          value={role}
-          onChange={(event) => setRole(event.target.value as "pencari" | "pemilik")}
+      {googleError && <Alert tone="error">{googleError}</Alert>}
+
+      <GoogleAuthButton
+        onSuccess={(cred) => handleGoogleRegister(cred)}
+        onError={(err) => setGoogleError(err.message)}
+        disabled={form.submitting || googleLoading}
+        text="signup_with"
+      />
+
+      <div className="auth-divider">
+        <span>atau daftar dengan email</span>
+      </div>
+
+      <div className="field">
+        <label id="register-role-label">
+          Pilih jenis akun
+          <span className="req" aria-hidden="true"> *</span>
+        </label>
+        <div
+          className="role-selector-group"
+          role="radiogroup"
+          aria-labelledby="register-role-label"
         >
-          <option value="pencari">Pencari kos (mencari &amp; menyimpan kos)</option>
-          <option value="pemilik">Pemilik kos (mendaftarkan &amp; mengelola kos)</option>
-        </select>
-      </label>
+          <button
+            type="button"
+            role="radio"
+            aria-checked={role === "pencari"}
+            className={`role-pill-btn ${role === "pencari" ? "active" : ""}`}
+            onClick={() => setRole("pencari")}
+          >
+            <span className="role-pill-icon">🔍</span>
+            <div className="role-pill-text">
+              <strong>Pencari Kos</strong>
+              <small>Cari & sewa kos</small>
+            </div>
+          </button>
+          <button
+            type="button"
+            role="radio"
+            aria-checked={role === "pemilik"}
+            className={`role-pill-btn ${role === "pemilik" ? "active" : ""}`}
+            onClick={() => setRole("pemilik")}
+          >
+            <span className="role-pill-icon">🏠</span>
+            <div className="role-pill-text">
+              <strong>Pemilik Kos</strong>
+              <small>Kelola properti</small>
+            </div>
+          </button>
+        </div>
+      </div>
+
       <Field label="Nama lengkap" autoComplete="name" placeholder="Nama sesuai identitas" required {...form.field("nama")} />
       <Field label="Alamat email" type="email" autoComplete="email" placeholder="nama@email.com" required {...form.field("email")} />
       <Field
@@ -112,7 +188,7 @@ export default function RegisterPage() {
         label="Kata sandi"
         type="password"
         autoComplete="new-password"
-        helper="Minimal 15 karakter, maksimal 72 byte. Gunakan frasa yang mudah diingat."
+        helper="Minimal 8 karakter. Boleh menggunakan huruf, angka, dan simbol."
         required
         {...form.field("password")}
       />
@@ -135,8 +211,8 @@ export default function RegisterPage() {
         </Link>
         .
       </Checkbox>
-      <Button type="submit" block loading={form.submitting}>
-        {role === "pemilik" ? "Daftar sebagai Pemilik" : "Buat Akun Pencari"}
+      <Button type="submit" block loading={form.submitting || googleLoading}>
+        Daftar Sekarang
       </Button>
       <p className="auth-alt">
         Sudah punya akun?{" "}

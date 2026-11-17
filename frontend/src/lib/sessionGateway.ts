@@ -2,9 +2,11 @@ import { NextRequest, NextResponse } from 'next/server';
 import { getBackendApiUrl } from './normalizer';
 
 const routes: Array<[RegExp, string[]]> = [
-  [/^auth\/(csrf|me)$/, ['GET']],
-  [/^auth\/(login|register|logout|forgot-password|reset-password|verify-email|resend-verification)$/, ['POST']],
-  [/^auth\/(profile|password)$/, ['PATCH']],
+  [/^auth\/csrf$/, ['GET']],
+  [/^auth\/me$/, ['GET', 'DELETE']],
+  [/^auth\/profile\/photo$/, ['POST', 'DELETE']],
+  [/^auth\/(login|register|google|logout|forgot-password|reset-password|verify-email|resend-verification)$/, ['POST']],
+  [/^auth\/(profile|password)$/, ['PATCH', 'PUT']],
   [/^auth\/notification-preferences$/, ['GET', 'PUT']],
   [/^notifikasi(?:\/jumlah)?$/, ['GET']],
   [/^notifikasi\/baca-semua$/, ['PATCH']],
@@ -35,8 +37,9 @@ export async function sessionGateway(request: NextRequest, path: string) {
   if (!routes.some(([pattern, methods]) => pattern.test(path) && methods.includes(request.method))) {
     return NextResponse.json({ success: false, message: 'Endpoint tidak tersedia.' }, { status: 404 });
   }
-  const origin = process.env.APP_ORIGIN || (process.env.NODE_ENV !== 'production' ? request.nextUrl.origin : '');
-  if (!['GET', 'HEAD'].includes(request.method) && (!origin || request.headers.get('origin') !== origin)) {
+  const origin = (process.env.APP_ORIGIN || (process.env.VERCEL_URL ? `https://${process.env.VERCEL_URL}` : request.nextUrl.origin)).replace(/\/$/, '');
+  const reqOrigin = request.headers.get('origin')?.replace(/\/$/, '') || '';
+  if (!['GET', 'HEAD'].includes(request.method) && (!origin || reqOrigin !== origin)) {
     return NextResponse.json({ success: false, message: 'Asal permintaan tidak diizinkan.' }, { status: 403 });
   }
   const timeout = AbortSignal.timeout(15000);

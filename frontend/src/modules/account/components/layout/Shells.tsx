@@ -49,13 +49,61 @@ export function AuthShell({ story = true, children }: { story?: boolean; childre
 function AuthStory() {
   return (
     <section className="auth-story" aria-label="Tentang Singgah Sana">
-      <h2 className="story-title">Tempat singgah.<br />Awal cerita.</h2>
-      <p>Simpan pilihan, tanyakan detail, dan temukan kos yang terasa pas untukmu.</p>
-      <ul>
-        <li><span className="story-icon"><Icon name="heart" /></span>Pilihan kos tersimpan rapi</li>
-        <li><span className="story-icon"><Icon name="message-circle" /></span>Percakapan langsung dengan pemilik</li>
-        <li><span className="story-icon"><Icon name="shield-check" /></span>Informasi kos ditinjau admin</li>
-      </ul>
+      <div className="story-graphic-wrap">
+        <div className="story-image-card">
+          <img
+            src="/assets/home-imgFotoKos-42ce5.png"
+            alt="Suasana kamar kos nyaman Singgah Sana"
+            className="story-main-img"
+          />
+          <div className="story-image-overlay" />
+          <div className="story-badge story-badge-top">
+            <span className="story-badge-star">★</span>
+            <span>4.9 · Terverifikasi</span>
+          </div>
+          <div className="story-badge story-badge-bottom">
+            <span className="story-badge-dot" />
+            <span>Kamar Siap Huni · Dekat UGM</span>
+          </div>
+        </div>
+
+        <div className="story-floating-card">
+          <div className="story-card-avatar">🏠</div>
+          <div className="story-card-content">
+            <div className="story-card-title">Kos Singgah Eksklusif</div>
+            <div className="story-card-sub">Mulai Rp 1.200.000 / bulan · WiFi & AC</div>
+          </div>
+        </div>
+      </div>
+
+      <div className="story-text-group">
+        <h2 className="story-title">
+          Tempat singgah.
+          <br />
+          Awal cerita.
+        </h2>
+        <p>Simpan pilihan, tanyakan detail, dan temukan kos yang terasa pas untukmu.</p>
+        <ul>
+          <li>
+            <span className="story-icon">
+              <Icon name="heart" />
+            </span>
+            Pilihan kos tersimpan rapi
+          </li>
+          <li>
+            <span className="story-icon">
+              <Icon name="message-circle" />
+            </span>
+            Percakapan langsung dengan pemilik
+          </li>
+          <li>
+            <span className="story-icon">
+              <Icon name="shield-check" />
+            </span>
+            Informasi kos ditinjau admin
+          </li>
+        </ul>
+      </div>
     </section>
   );
 }

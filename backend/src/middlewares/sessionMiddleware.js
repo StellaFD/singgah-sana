@@ -32,9 +32,15 @@ function validateCsrf(req, res, next) {
   const sessionFlow = Boolean(req.headers['x-csrf-token'] || readCookie(req));
   if (safeMethod(req.method) || !sessionFlow) return next();
   const origin = req.headers.origin;
-  const allowedOrigin = process.env.APP_ORIGIN || (process.env.NODE_ENV === 'production' ? null : 'http://localhost:3000');
+  const isDevLocalhost = process.env.NODE_ENV !== 'production' && origin && /^http:\/\/(localhost|127\.0\.0\.1)(:\d+)?$/.test(origin);
+  const origins = (process.env.APP_ORIGIN || '')
+    .split(',')
+    .map(o => o.trim().replace(/\/$/, ''))
+    .filter(Boolean);
+  const normalizedOrigin = (origin || '').replace(/\/$/, '');
+  const isAllowedOrigin = isDevLocalhost || (origins.length > 0 && origins.includes(normalizedOrigin)) || (process.env.NODE_ENV !== 'production' && normalizedOrigin === 'http://localhost:3000');
   const token = req.headers['x-csrf-token'];
-  if (!allowedOrigin || origin !== allowedOrigin || typeof token !== 'string' ||
+  if (!isAllowedOrigin || typeof token !== 'string' ||
       !req.sessionRecord || !crypto.timingSafeEqual(Buffer.from(digest(token), 'hex'), Buffer.from(req.sessionRecord.csrf_hash, 'hex'))) {
     return res.status(403).json({ success: false, code: 'CSRF_INVALID', message: 'Sesi formulir tidak valid. Muat ulang lalu coba lagi.' });
   }

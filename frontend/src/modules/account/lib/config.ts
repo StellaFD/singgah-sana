@@ -39,8 +39,8 @@ export const features = {
   recovery: true,
   /** Layanan verifikasi email via Brevo SMTP */
   emailVerification: true,
-  /** Layanan penghapusan akun mandiri belum tersedia di backend */
-  accountDeletion: false,
+  /** Layanan penghapusan akun mandiri diaktifkan */
+  accountDeletion: true,
 } as const;
 
 /** Rute milik bagian FE lain (jelajah, detail kos, ruang pemilik, halaman statis). */

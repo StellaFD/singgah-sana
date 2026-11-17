@@ -89,6 +89,9 @@ export async function sessionRequest<T>(
   signal?.throwIfAborted();
 
   if (!response.ok || !result || result.success !== true) {
+    if (response.status === 401 && typeof window !== 'undefined' && !path.startsWith('/auth/')) {
+      window.dispatchEvent(new CustomEvent('ss:session-expired', { detail: { path } }));
+    }
     throw new SessionError(
       typeof result?.message === 'string'
         ? result.message

@@ -29,6 +29,7 @@ export default function ProfilePage() {
   const toast = useToast();
   const form = useForm<V>({ nama: user!.nama, telepon: user!.telepon }, schema);
   const [photoOpen, setPhotoOpen] = useState(false);
+  const [removingPhoto, setRemovingPhoto] = useState(false);
   const [pendingNav, setPendingNav] = useState<string | null>(null);
   const dirtyRef = useRef(false);
   dirtyRef.current = form.dirty;
@@ -67,6 +68,19 @@ export default function ProfilePage() {
     navigate(target, { force: true });
   };
 
+  const handleRemovePhoto = async () => {
+    setRemovingPhoto(true);
+    try {
+      const updated = await accountApi.deletePhoto();
+      setUser(updated);
+      toast.show({ tone: "success", message: "Foto profil dihapus." });
+    } catch (err) {
+      toast.show({ tone: "error", message: errorMessage(err, "Gagal menghapus foto profil.") });
+    } finally {
+      setRemovingPhoto(false);
+    }
+  };
+
   if (!user) return null;
   return (
     <AccountLayout>
@@ -76,8 +90,13 @@ export default function ProfilePage() {
           <Avatar nama={user.nama} fotoUrl={user.fotoUrl} size={64} />
           <div>
             <h2 className="h4">Foto profil</h2>
-            <p className="muted small">JPG atau PNG, maksimal {limits.avatarMaxBytes / 1024 / 1024} MB. Gunakan foto yang jelas.</p>
-            <Button variant="secondary" disabled title="Pengunggahan foto profil belum diaktifkan">Ubah foto</Button>
+            <p className="muted small">JPG, PNG, atau WebP, maksimal {limits.avatarMaxBytes / 1024 / 1024} MB. Gunakan foto yang jelas.</p>
+            <div style={{ display: 'flex', gap: '8px', marginTop: '8px' }}>
+              <Button variant="secondary" onClick={() => setPhotoOpen(true)}>Ubah foto</Button>
+              {user.fotoUrl && (
+                <Button variant="ghost" onClick={handleRemovePhoto} loading={removingPhoto}>Hapus foto</Button>
+              )}
+            </div>
           </div>
         </div>
         <form onSubmit={onSubmit} noValidate ref={form.formRef} className="stack-lg">
@@ -154,11 +173,11 @@ function PhotoDialog({ onClose }: { onClose: () => void }) {
   return (
     <Dialog title="Ubah foto profil" description="Pilih foto yang jelas agar pemilik mudah mengenalimu." onClose={onClose}>
       {error && <Alert tone="error">{error}</Alert>}
-      <input ref={input} type="file" accept="image/jpeg,image/png" hidden onChange={(e) => { pick(e.target.files?.[0]); e.target.value = ""; }} />
+      <input ref={input} type="file" accept="image/jpeg,image/png,image/webp" hidden onChange={(e) => { pick(e.target.files?.[0]); e.target.value = ""; }} />
       <div className="upload">
         {preview ? <Image unoptimized width={180} height={180} src={preview} alt="Pratinjau foto profil" className="upload-preview" /> : <Avatar nama="?" size={64} />}
         <h3 className="h4">{file ? file.name : "Pilih foto dari perangkat"}</h3>
-        <p className="muted small">JPG atau PNG · Maksimal {limits.avatarMaxBytes / 1024 / 1024} MB</p>
+        <p className="muted small">JPG, PNG, atau WebP · Maksimal {limits.avatarMaxBytes / 1024 / 1024} MB</p>
         <Button variant="secondary" onClick={() => input.current?.click()} data-autofocus>{file ? "Ganti foto" : "Pilih foto"}</Button>
       </div>
       <div className="dialog-actions">

@@ -10,7 +10,7 @@ export function useFavorit(){
  useEffect(()=>{
   if(!auth.isAuthenticated||auth.user?.role!=='pencari'){setIds([]);return;}
   const controller=new AbortController();
-  const load=()=>{void sessionRequest<{data:Array<{kos_id:{_id:string}}>}>('/favorit',{signal:controller.signal}).then(r=>setIds(r.data.map(item=>item.kos_id._id))).catch(error=>{if(!controller.signal.aborted)setToast(error.message);});};
+  const load=()=>{void sessionRequest<{data:Array<{kos_id:{_id:string}}>}>('/favorit',{signal:controller.signal}).then(r=>setIds(r.data.filter(item=>item?.kos_id?._id).map(item=>item.kos_id._id))).catch(error=>{if(!controller.signal.aborted)setToast(error.message);});};
   load();window.addEventListener('ss:favorites-changed',load);return()=>{controller.abort();window.removeEventListener('ss:favorites-changed',load);};
  },[auth.isAuthenticated,auth.user?.id,auth.user?.role]);
  const toggleFavorit=useCallback(async(id:string)=>{
