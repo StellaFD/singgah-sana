@@ -13,10 +13,15 @@ const nodemailer = require('nodemailer');
  */
 
 function getAppOrigin() {
-  const origin = process.env.APP_ORIGIN;
-  if (typeof origin === 'string' && origin.trim()) {
+  const raw = process.env.APP_ORIGIN;
+  const origins = (typeof raw === 'string' ? raw : '')
+    .split(',')
+    .map(o => o.trim().replace(/\/$/, ''))
+    .filter(Boolean);
+  const primary = origins[0] || '';
+  if (primary) {
     try {
-      const parsed = new URL(origin.trim());
+      const parsed = new URL(primary);
       const isProd = process.env.NODE_ENV === 'production';
       // Di produksi wajib HTTPS, di dev/test boleh HTTP/HTTPS
       if (isProd && parsed.protocol !== 'https:') {
@@ -25,11 +30,8 @@ function getAppOrigin() {
       if (!['http:', 'https:'].includes(parsed.protocol)) {
         return '';
       }
-      // Dilarang membawa credential (user:pass), path kustom selain '/', query, atau fragment
+      // Dilarang membawa credential (user:pass), query, atau fragment
       if (parsed.username || parsed.password) {
-        return '';
-      }
-      if (parsed.pathname && parsed.pathname !== '/') {
         return '';
       }
       if (parsed.search || parsed.hash) {

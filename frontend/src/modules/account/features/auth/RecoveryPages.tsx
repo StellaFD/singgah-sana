@@ -90,8 +90,9 @@ function EnabledForgotPasswordPage() {
     { email: [required("Masukkan alamat email."), email()] }
   );
   const onSubmit = form.submit(async (v) => {
-    await authApi.forgotPassword({ email: v.email.trim() }); // respons sama untuk email terdaftar/tidak (anti enumerasi)
-    navigate("/lupa-sandi/terkirim", { force: true });
+    const trimmed = v.email.trim();
+    await authApi.forgotPassword({ email: trimmed }); // respons sama untuk email terdaftar/tidak (anti enumerasi)
+    navigate(`/lupa-sandi/terkirim?email=${encodeURIComponent(trimmed)}`, { force: true });
   });
   return (
     <AuthCard
@@ -131,18 +132,72 @@ export function ForgotPasswordPage() {
 }
 
 function EnabledRecoverySentPage() {
+  const { query } = useLocation();
+  const emailParam = query.get("email") || "";
+  const cooldown = useCooldown(limits.resendCooldownSeconds);
+  const [sending, setSending] = useState(false);
+  const [notice, setNotice] = useState<{ tone: "success" | "error"; text: string } | null>(null);
+
+  useEffect(() => {
+    cooldown.start();
+  }, []);
+
+  const handleResend = async () => {
+    if (!emailParam) {
+      navigate("/lupa-sandi", { force: true });
+      return;
+    }
+    setSending(true);
+    setNotice(null);
+    try {
+      await authApi.forgotPassword({ email: emailParam });
+      cooldown.start();
+      setNotice({
+        tone: "success",
+        text: "Tautan pemulihan baru telah dikirim. Silakan periksa kembali email Anda.",
+      });
+    } catch (e) {
+      setNotice({
+        tone: "error",
+        text: errorMessage(e, "Gagal mengirim ulang tautan pemulihan."),
+      });
+    } finally {
+      setSending(false);
+    }
+  };
+
   return (
     <AuthCard
       title="Periksa kotak masukmu"
-      description="Jika email tersebut terdaftar, tautan pemulihan akan segera dikirim."
+      description={
+        emailParam ? (
+          <>
+            Jika <strong>{emailParam}</strong> terdaftar, tautan pemulihan akan segera dikirim.
+          </>
+        ) : (
+          "Jika email tersebut terdaftar, tautan pemulihan akan segera dikirim."
+        )
+      }
     >
       <StatusIcon name="mail" />
+      {notice && <Alert tone={notice.tone}>{notice.text}</Alert>}
       <ButtonLink to="/masuk" block>
         Kembali masuk
       </ButtonLink>
-      <ButtonLink to="/lupa-sandi" variant="secondary" block>
-        Kirim ulang tautan
-      </ButtonLink>
+      <Button
+        variant="secondary"
+        block
+        onClick={handleResend}
+        loading={sending}
+        disabled={cooldown.left > 0}
+      >
+        {cooldown.left > 0
+          ? `Kirim ulang tautan (${cooldown.left} dtk)`
+          : "Kirim ulang tautan"}
+      </Button>
+      <Link to="/lupa-sandi" className="link">
+        Gunakan alamat email lain
+      </Link>
     </AuthCard>
   );
 }
