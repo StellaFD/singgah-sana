@@ -37,9 +37,15 @@ export async function sessionGateway(request: NextRequest, path: string) {
   if (!routes.some(([pattern, methods]) => pattern.test(path) && methods.includes(request.method))) {
     return NextResponse.json({ success: false, message: 'Endpoint tidak tersedia.' }, { status: 404 });
   }
-  const origin = (process.env.APP_ORIGIN || (process.env.VERCEL_URL ? `https://${process.env.VERCEL_URL}` : request.nextUrl.origin)).replace(/\/$/, '');
+  const allowedOrigins = [
+    process.env.APP_ORIGIN,
+    request.nextUrl.origin,
+    process.env.VERCEL_URL ? `https://${process.env.VERCEL_URL}` : '',
+    process.env.VERCEL_PROJECT_PRODUCTION_URL ? `https://${process.env.VERCEL_PROJECT_PRODUCTION_URL}` : '',
+  ].filter(Boolean).map(u => u.replace(/\/$/, ''));
+
   const reqOrigin = request.headers.get('origin')?.replace(/\/$/, '') || '';
-  if (!['GET', 'HEAD'].includes(request.method) && (!origin || reqOrigin !== origin)) {
+  if (!['GET', 'HEAD'].includes(request.method) && (!reqOrigin || !allowedOrigins.includes(reqOrigin))) {
     return NextResponse.json({ success: false, message: 'Asal permintaan tidak diizinkan.' }, { status: 403 });
   }
   const timeout = AbortSignal.timeout(15000);
@@ -49,7 +55,8 @@ export async function sessionGateway(request: NextRequest, path: string) {
     const cookie = request.headers.get('cookie')?.split(';').map(value => value.trim())
       .find(value => /^ss\.sid=[\w-]{43}$/.test(value));
     if (cookie) headers.set('Cookie', cookie);
-    if (origin) headers.set('Origin', origin);
+    const forwardOrigin = process.env.APP_ORIGIN || reqOrigin || request.nextUrl.origin;
+    if (forwardOrigin) headers.set('Origin', forwardOrigin.replace(/\/$/, ''));
     const csrf = request.headers.get('x-csrf-token');
     if (csrf) headers.set('X-CSRF-Token', csrf);
     const contentType = request.headers.get('content-type');
