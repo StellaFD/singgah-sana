@@ -33,6 +33,8 @@ export type AdminKosListItem = {
   status_moderasi: AdminKosModerationStatus | null;
   updatedAt: string;
   isMockDecision: boolean;
+  /** ID pengajuan pending yang aktif, bila ada (hanya pada kontrak V1). */
+  pengajuanId: string | null;
 };
 
 export type AdminKosListResponse = {
@@ -111,10 +113,21 @@ function getTargetKosList(result: unknown): AdminKosListResponse {
 
     const publicData = isRecord(item.data_publik) ? item.data_publik : null;
     const draftData = isRecord(item.draft) ? item.draft : null;
-    const nama = draftData?.nama ?? publicData?.nama;
-    if (typeof nama !== 'string' || nama.length === 0) {
-      throw new Error('Nama kos tidak tersedia pada data API.');
-    }
+    const rawNama = draftData?.nama ?? publicData?.nama;
+    // Draf yang baru dibuat boleh belum punya nama; jangan gagalkan seluruh tabel
+    const nama =
+      typeof rawNama === 'string' && rawNama.trim().length > 0
+        ? rawNama
+        : 'Draf tanpa nama';
+    const pendingSubmission = isRecord(item.perubahan_tertunda)
+      ? item.perubahan_tertunda
+      : null;
+    const pengajuanId =
+      pendingSubmission &&
+      pendingSubmission.status === 'pending' &&
+      typeof pendingSubmission._id === 'string'
+        ? pendingSubmission._id
+        : null;
 
     const areaKampus = draftData?.area_kampus ?? publicData?.area_kampus;
     const alamat = draftData?.alamat ?? publicData?.alamat;
@@ -137,6 +150,7 @@ function getTargetKosList(result: unknown): AdminKosListResponse {
       status_moderasi: item.status_moderasi,
       updatedAt: item.updatedAt,
       isMockDecision: false,
+      pengajuanId,
     };
   });
 
@@ -191,6 +205,7 @@ function getLegacyKosList(result: unknown): AdminKosListResponse {
         : null,
       updatedAt: item.updatedAt,
       isMockDecision: item.isMockDecision === true,
+      pengajuanId: null,
     };
   });
 

@@ -2,7 +2,6 @@
 
 import React, { useState, useEffect, useRef } from 'react';
 import Link from 'next/link';
-import Image from 'next/image';
 import { useParams } from 'next/navigation';
 import {
   ShieldCheck,
@@ -19,6 +18,7 @@ import Button from '@/components/ui/Button';
 import Skeleton from '@/components/ui/Skeleton';
 import Toast from '@/components/ui/Toast';
 import GalleryDialog from '@/components/kos/GalleryDialog';
+import FallbackImage from '@/components/kos/FallbackImage';
 import InquiryModal from '@/components/kos/InquiryModal';
 import ResultMap from '@/components/kos/ResultMap';
 import { getKosByIdOrSlug } from '@/features/kos/kosClient';
@@ -150,16 +150,18 @@ export default function KosDetailPage() {
     <div className="flex flex-col font-inter bg-white pb-20">
       {/* 1. Galeri Foto */}
       <section className="max-w-[1440px] mx-auto w-full px-6 sm:px-12 lg:px-16 pt-8 pb-4">
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-4 h-[350px] sm:h-[420px] rounded-2xl overflow-hidden relative">
+        <div
+          className={`grid grid-cols-1 ${photos.length > 1 ? 'md:grid-cols-3' : ''} gap-4 h-[350px] sm:h-[420px] rounded-2xl overflow-hidden relative`}
+        >
           {/* Foto Utama Besar */}
           <div
-            className="md:col-span-2 relative h-full bg-surface-muted cursor-pointer overflow-hidden group"
+            className={`${photos.length > 1 ? 'md:col-span-2' : ''} relative h-full bg-surface-muted cursor-pointer overflow-hidden group`}
             onClick={() => {
               setGalleryIndex(0);
               setGalleryOpen(true);
             }}
           >
-            <Image
+            <FallbackImage
               src={photos[0]}
               alt={kos.nama}
               fill
@@ -168,37 +170,28 @@ export default function KosDetailPage() {
             />
           </div>
 
-          {/* 2 Foto Vertikal di Kanan */}
-          <div className="hidden md:flex flex-col gap-4 h-full">
-            <div
-              className="relative flex-1 bg-surface-muted cursor-pointer overflow-hidden group rounded-xl"
-              onClick={() => {
-                setGalleryIndex(1 % photos.length);
-                setGalleryOpen(true);
-              }}
-            >
-              <Image
-                src={photos[1] || photos[0]}
-                alt={`${kos.nama} preview 2`}
-                fill
-                className="object-cover group-hover:scale-102 transition-transform duration-300"
-              />
+          {/* Foto pendamping di kanan: hanya foto yang memang ada, tanpa mengulang foto utama */}
+          {photos.length > 1 && (
+            <div className="hidden md:flex flex-col gap-4 h-full">
+              {photos.slice(1, 3).map((foto, offset) => (
+                <div
+                  key={`${foto}-${offset}`}
+                  className="relative flex-1 bg-surface-muted cursor-pointer overflow-hidden group rounded-xl"
+                  onClick={() => {
+                    setGalleryIndex(offset + 1);
+                    setGalleryOpen(true);
+                  }}
+                >
+                  <FallbackImage
+                    src={foto}
+                    alt={`${kos.nama} preview ${offset + 2}`}
+                    fill
+                    className="object-cover group-hover:scale-102 transition-transform duration-300"
+                  />
+                </div>
+              ))}
             </div>
-            <div
-              className="relative flex-1 bg-surface-muted cursor-pointer overflow-hidden group rounded-xl"
-              onClick={() => {
-                setGalleryIndex(2 % photos.length);
-                setGalleryOpen(true);
-              }}
-            >
-              <Image
-                src={photos[2] || photos[0]}
-                alt={`${kos.nama} preview 3`}
-                fill
-                className="object-cover group-hover:scale-102 transition-transform duration-300"
-              />
-            </div>
-          </div>
+          )}
 
           {/* Tombol Buka Galeri */}
           <button

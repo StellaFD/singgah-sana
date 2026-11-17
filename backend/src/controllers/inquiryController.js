@@ -2,6 +2,7 @@ const Inquiry = require('../models/Inquiry');
 const Kos = require('../models/Kos');
 const { isKosPubliclyVisible } = require('../utils/visibility');
 const { kirimNotifikasi } = require('../utils/notifikasi');
+const Notifikasi = require('../models/Notifikasi');
 
 const PESAN_INQUIRY_DUPLIKAT =
   'Anda masih memiliki pertanyaan yang menunggu balasan untuk kos ini. Mohon tunggu balasan pemilik sebelum mengirim pertanyaan baru';
@@ -196,7 +197,7 @@ const sendInquiry = async (req, res, next) => {
           tipe: 'pesan_baru',
           judul: 'Pertanyaan baru dari calon penghuni',
           isi: teksTrim,
-          tautan: '/pemilik/pesan',
+          tautan: `/pemilik/pesan?id=${updated._id}`,
         });
 
         return res.status(200).json({
@@ -220,7 +221,7 @@ const sendInquiry = async (req, res, next) => {
         tipe: 'pesan_baru',
         judul: 'Pertanyaan baru dari calon penghuni',
         isi: teksTrim,
-        tautan: '/pemilik/pesan',
+        tautan: `/pemilik/pesan?id=${existingThread._id}`,
       });
 
       return res.status(200).json({
@@ -243,7 +244,7 @@ const sendInquiry = async (req, res, next) => {
       tipe: 'pesan_baru',
       judul: 'Pertanyaan baru',
       isi: teksTrim,
-      tautan: '/pemilik/pesan',
+      tautan: `/pemilik/pesan?id=${inquiry._id}`,
     });
 
     res.status(201).json({
@@ -422,6 +423,19 @@ const getInquiryById = async (req, res, next) => {
       });
     }
 
+    // Membuka percakapan = membaca notifikasinya (hanya halaman pertama, bukan saat memuat pesan lama)
+    if (!req.query.before && !req.query.cursor) {
+      const tautanPercakapan = isPencari
+        ? [`/pesan?c=${inquiry._id}`]
+        : [`/pemilik/pesan?id=${inquiry._id}`];
+      await Notifikasi.updateMany(
+        { user_id: req.user._id, dibaca: false, tautan: { $in: tautanPercakapan } },
+        { $set: { dibaca: true } }
+      ).catch((error) => {
+        console.error(`[Notifikasi] Gagal menandai notifikasi percakapan: ${error.message}`);
+      });
+    }
+
     // Dukungan batas dan pagination cursor riwayat pesan (default 50 pesan terakhir)
     const limit = Math.max(1, Math.min(100, parseInt(req.query.limit, 10) || 50));
     const fullHistory = inquiry.riwayat_pesan || [];
@@ -534,7 +548,7 @@ const appendMessage = async (req, res, next) => {
     };
 
     const targetUserId = isPencari ? inquiry.pemilik_id : inquiry.pencari_id;
-    const targetTautan = isPencari ? '/pemilik/pesan' : `/pesan?c=${inquiry._id}`;
+    const targetTautan = isPencari ? `/pemilik/pesan?id=${inquiry._id}` : `/pesan?c=${inquiry._id}`;
 
     if (clientMsgId) {
       // 1. Cek idempotensi pada dokumen saat ini
@@ -591,6 +605,11 @@ const appendMessage = async (req, res, next) => {
             },
           });
         }
+        // Percakapan hilang di tengah proses; jangan lanjut membaca updatedInquiry (null)
+        return res.status(409).json({
+          success: false,
+          message: 'Percakapan berubah saat pesan dikirim. Muat ulang lalu coba lagi.',
+        });
       }
 
       await kirimNotifikasi(targetUserId, {

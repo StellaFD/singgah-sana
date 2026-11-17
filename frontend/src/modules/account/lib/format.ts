@@ -14,6 +14,6 @@ export function formatTime(iso: string, nowMs = Date.now()) {
   if (yesterday) return `Kemarin · ${jam}`;
   return d.toLocaleDateString("id-ID", { day: "numeric", month: "short", year: "numeric" });
 }
-export const formatDate = (iso: string) => iso ? new Date(iso).toLocaleDateString("id-ID", { day: "numeric", month: "short", year: "numeric" }) : "Belum tersedia";
+export const formatDate = (iso: string) => iso ? new Date(iso).toLocaleDateString("id-ID", { day: "numeric", month: "short", year: "numeric", timeZone: "Asia/Jakarta" }) : "Belum tersedia";
 export const formatClock = (iso: string) =>
-  new Date(iso).toLocaleTimeString("id-ID", { hour: "2-digit", minute: "2-digit" }).replace(":", ".");
+  new Date(iso).toLocaleTimeString("id-ID", { hour: "2-digit", minute: "2-digit", timeZone: "Asia/Jakarta" }).replace(":", ".");

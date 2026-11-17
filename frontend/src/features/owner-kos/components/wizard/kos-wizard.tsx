@@ -337,6 +337,9 @@ export function KosWizard({ kos }: KosWizardProps) {
             // Update draf awal ke konten lengkap
             targetKos = await updateDraft(targetKos._id, targetKos.version, input);
           }
+          // Simpan segera: bila pengajuan di bawah gagal, percobaan ulang memperbarui
+          // draf yang sama alih-alih membuat draf duplikat baru
+          setCurrentKos(targetKos);
 
           // Ajukan draf awal
           await submitInitialKos(targetKos._id, targetKos.version);
@@ -525,7 +528,7 @@ export function KosWizard({ kos }: KosWizardProps) {
               <Button
                 variant="secondary"
                 onClick={onSaveServerDraft}
-                disabled={submitting}
+                disabled={submitting || isSavingDraft}
                 loading={isSavingDraft}
               >
                 Simpan draf ke server

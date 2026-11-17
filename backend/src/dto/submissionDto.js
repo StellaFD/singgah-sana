@@ -19,6 +19,14 @@ function toPhotoDto(photo, assetMap = {}) {
       alt: typeof photo.alt === 'string' ? photo.alt : '',
     };
   }
+  // Snapshot foto legacy: URL tanpa MediaAsset (mis. dibuat oleh backfill)
+  if (typeof photo === 'object' && typeof photo.url === 'string' && photo.url) {
+    return {
+      asset_id: null,
+      url: ensureAbsoluteUrl(photo.url),
+      alt: typeof photo.alt === 'string' ? photo.alt : '',
+    };
+  }
   if (typeof photo === 'string') {
     const asset = assetMap[photo];
     return {
