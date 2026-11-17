@@ -5,14 +5,37 @@ const { logAdminAction } = require('../services/auditService');
 const { safeSearchTerm, parsePagination, csvCell } = require('../utils/helpers');
 const { kirimNotifikasi } = require('../utils/notifikasi');
 const { getPublicVisibilityQuery } = require('../utils/visibility');
+const { toKosAdminDto } = require('../dto/submissionDto');
+
+const ADMIN_KOS_STATUS_FILTERS = {
+  status_verifikasi: ['draft', 'pending', 'revision', 'approved', 'rejected'],
+  status_publikasi: ['active', 'archived'],
+  status_moderasi: ['normal', 'suspended'],
+};
 
 const getAllKosAdmin = async (req, res, next) => {
   try {
-    const { status, q, page, limit } = req.query;
+    const { q, page, limit } = req.query;
 
     const filter = { deleted_at: null };
-    if (status) {
-      filter.status_verifikasi = String(status).toLowerCase();
+    // `status` dipertahankan untuk klien lama; `status_verifikasi` sesuai kontrak V1
+    const statusVerifikasi = req.query.status_verifikasi || req.query.status;
+    const requestedStatuses = {
+      status_verifikasi: statusVerifikasi,
+      status_publikasi: req.query.status_publikasi,
+      status_moderasi: req.query.status_moderasi,
+    };
+    for (const [field, value] of Object.entries(requestedStatuses)) {
+      if (!value) continue;
+      const normalized = String(value).toLowerCase();
+      if (!ADMIN_KOS_STATUS_FILTERS[field].includes(normalized)) {
+        return res.status(422).json({
+          success: false,
+          code: 'VALIDATION_ERROR',
+          message: `Filter ${field} tidak valid`,
+        });
+      }
+      filter[field] = normalized;
     }
     if (q) {
       const term = safeSearchTerm(q);
@@ -20,6 +43,7 @@ const getAllKosAdmin = async (req, res, next) => {
         { nama: { $regex: term, $options: 'i' } },
         { alamat: { $regex: term, $options: 'i' } },
         { area_kampus: { $regex: term, $options: 'i' } },
+        { 'draft_konten.nama': { $regex: term, $options: 'i' } },
       ];
     }
 
@@ -30,11 +54,18 @@ const getAllKosAdmin = async (req, res, next) => {
     const currentPage = Math.min(pageNum, totalPages);
     const skip = (currentPage - 1) * limitNum;
     const dataKos = await Kos.find(filter)
-      .populate('pemilik_id', 'nama nomor_telepon email')
-      .populate('diverifikasi_oleh', 'nama email')
+      .populate('pemilik_id', 'nama email nomor_telepon role status email_verified version createdAt updatedAt alasan_suspend')
       .sort({ createdAt: -1 })
       .skip(skip)
       .limit(limitNum);
+
+    const activeSubmissions = await Pengajuan.find({
+      kos_id: { $in: dataKos.map((kos) => kos._id) },
+      is_active: true,
+    });
+    const submissionByKos = new Map(
+      activeSubmissions.map((pengajuan) => [String(pengajuan.kos_id), pengajuan])
+    );
 
     res.status(200).json({
       success: true,
@@ -45,7 +76,7 @@ const getAllKosAdmin = async (req, res, next) => {
         currentPage,
         limit: limitNum,
       },
-      data: dataKos,
+      data: dataKos.map((kos) => toKosAdminDto(kos, submissionByKos.get(String(kos._id)) || null)),
     });
   } catch (error) {
     next(error);

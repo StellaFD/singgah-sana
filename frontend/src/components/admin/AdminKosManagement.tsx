@@ -117,6 +117,69 @@ function StatusBadge({
   );
 }
 
+const rowActionClass =
+  'inline-flex rounded-lg border border-slate-300 px-3 py-2 text-sm font-semibold text-slate-700 hover:border-indigo-300 hover:bg-indigo-50 hover:text-indigo-800';
+
+function KosRowAction({
+  kos,
+  useTargetApi,
+}: {
+  kos: AdminKosListItem;
+  useTargetApi: boolean;
+}) {
+  // Mode legacy: halaman review membaca ID kos secara langsung
+  if (!useTargetApi) {
+    return (
+      <Link
+        className={rowActionClass}
+        href={{
+          pathname: `/admin/review/${encodeURIComponent(kos._id)}`,
+          query: { source: 'all-kos' },
+        }}
+      >
+        Lihat
+      </Link>
+    );
+  }
+
+  // Kontrak V1: halaman review membutuhkan ID pengajuan, bukan ID kos
+  if (kos.pengajuanId) {
+    return (
+      <Link
+        className={rowActionClass}
+        href={{
+          pathname: `/admin/review/${encodeURIComponent(kos.pengajuanId)}`,
+          query: { source: 'all-kos' },
+        }}
+      >
+        Tinjau
+      </Link>
+    );
+  }
+
+  if (kos.status_verifikasi === 'approved') {
+    return (
+      <Link
+        className={rowActionClass}
+        href={`/kos/${encodeURIComponent(kos._id)}`}
+        rel="noopener noreferrer"
+        target="_blank"
+      >
+        Lihat
+      </Link>
+    );
+  }
+
+  return (
+    <span
+      className="text-sm text-slate-400"
+      title="Tidak ada pengajuan yang menunggu tinjauan untuk kos ini"
+    >
+      —
+    </span>
+  );
+}
+
 export default function AdminKosManagement({
   token,
   expireSession,
@@ -532,15 +595,7 @@ export default function AdminKosManagement({
                   {formatAdminDate(kos.updatedAt)}
                 </td>
                 <td className="px-4 py-4 text-right">
-                  <Link
-                    className="inline-flex rounded-lg border border-slate-300 px-3 py-2 text-sm font-semibold text-slate-700 hover:border-indigo-300 hover:bg-indigo-50 hover:text-indigo-800"
-                    href={{
-                      pathname: `/admin/review/${encodeURIComponent(kos._id)}`,
-                      query: { source: 'all-kos' },
-                    }}
-                  >
-                    Lihat
-                  </Link>
+                  <KosRowAction kos={kos} useTargetApi={useTargetApi} />
                 </td>
               </tr>
             ))}

@@ -4,6 +4,7 @@ const connectDB = require('./src/config/db');
 
 const { getJwtSecret } = require('./src/config/jwt');
 const { assertMediaStorageReady } = require('./src/config/mediaStorage');
+const { runLegacyBackfill } = require('./src/utils/legacyBackfill');
 
 const PORT = process.env.PORT || 5000;
 
@@ -17,7 +18,15 @@ try {
 }
 
 // Hubungkan ke MongoDB
-connectDB().then(() => {
+connectDB().then(async () => {
+  // Lengkapi data kos legacy (idempotent). Kegagalan tidak menghentikan server.
+  try {
+    await runLegacyBackfill();
+  } catch (err) {
+    console.error(`[Backfill Error] ${err.message}`);
+  }
+
+
   app.listen(PORT, () => {
     console.log(`====================================================`);
     console.log(`🚀 Server Singgah-sana berjalan pada port: ${PORT}`);
