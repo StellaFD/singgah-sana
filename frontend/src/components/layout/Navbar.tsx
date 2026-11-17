@@ -264,15 +264,32 @@ export default function Navbar() {
                     aria-label="Menu akun"
                   >
                     {/* Header Info Akun */}
-                    <div className="px-3 py-2.5 border-b border-surface-border/70 mb-1">
-                      <p className="text-sm font-bold text-ink truncate">{userName}</p>
-                      {auth.user?.email && (
-                        <p className="text-xs text-ink-muted truncate mt-0.5">{auth.user.email}</p>
+                    <div className="px-3 py-2.5 border-b border-surface-border/70 mb-1 flex items-center gap-3">
+                      {avatarUrl ? (
+                        <div className="relative w-10 h-10 rounded-full overflow-hidden shrink-0 border border-surface-border">
+                          <Image
+                            src={avatarUrl}
+                            alt={userName}
+                            fill
+                            className="object-cover"
+                            unoptimized
+                          />
+                        </div>
+                      ) : (
+                        <div className="w-10 h-10 rounded-full bg-brand-lavender text-brand-primary flex items-center justify-center font-semibold text-sm shrink-0">
+                          {userInitials}
+                        </div>
                       )}
-                      <div className="mt-1.5">
-                        <span className="inline-block rounded-full px-2.5 py-0.5 text-[10px] font-bold uppercase tracking-wider bg-brand-lavender text-brand-primary border border-brand-primary/20">
-                          {currentRoleLabel}
-                        </span>
+                      <div className="min-w-0 flex-1">
+                        <p className="text-sm font-bold text-ink truncate">{userName}</p>
+                        {auth.user?.email && (
+                          <p className="text-xs text-ink-muted truncate mt-0.5">{auth.user.email}</p>
+                        )}
+                        <div className="mt-1">
+                          <span className="inline-block rounded-full px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider bg-brand-lavender text-brand-primary border border-brand-primary/20">
+                            {currentRoleLabel}
+                          </span>
+                        </div>
                       </div>
                     </div>
 

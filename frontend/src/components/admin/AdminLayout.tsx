@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState, type ReactNode } from 'react';
 import Link from 'next/link';
+import Image from 'next/image';
 import BrandLogo from '@/components/brand/BrandLogo';
 import {
   Activity,
@@ -247,12 +248,24 @@ export default function AdminLayout({
                 aria-haspopup="menu"
                 aria-label="Menu akun admin"
               >
-                <span
-                  aria-hidden="true"
-                  className="flex h-10 w-10 items-center justify-center rounded-full bg-brand-lavender text-sm font-semibold text-brand-primary shrink-0"
-                >
-                  {admin.nama?.trim().charAt(0).toUpperCase() || 'A'}
-                </span>
+                {admin.foto_profil ? (
+                  <div className="relative w-10 h-10 rounded-full overflow-hidden shrink-0 border border-purple-200">
+                    <Image
+                      src={admin.foto_profil as string}
+                      alt={admin.nama || 'Admin'}
+                      fill
+                      className="object-cover"
+                      unoptimized
+                    />
+                  </div>
+                ) : (
+                  <span
+                    aria-hidden="true"
+                    className="flex h-10 w-10 items-center justify-center rounded-full bg-brand-lavender text-sm font-semibold text-brand-primary shrink-0"
+                  >
+                    {admin.nama?.trim().charAt(0).toUpperCase() || 'A'}
+                  </span>
+                )}
                 <span className="hidden sm:inline text-sm font-semibold text-slate-900 max-w-[140px] truncate">
                   {admin.nama}
                 </span>
@@ -269,15 +282,32 @@ export default function AdminLayout({
                   role="menu"
                   aria-label="Menu akun"
                 >
-                  <div className="px-3 py-2.5 border-b border-slate-100 mb-1">
-                    <p className="text-sm font-bold text-slate-900 truncate">{admin.nama}</p>
-                    {admin.email && (
-                      <p className="text-xs text-slate-500 truncate mt-0.5">{admin.email}</p>
-                    )}
-                    <div className="mt-1.5">
-                      <span className="inline-block rounded-full px-2.5 py-0.5 text-[10px] font-bold uppercase tracking-wider bg-brand-lavender text-brand-primary border border-brand-primary/20">
-                        Administrator
+                  <div className="px-3 py-2.5 border-b border-slate-100 mb-1 flex items-center gap-3">
+                    {admin.foto_profil ? (
+                      <div className="relative w-10 h-10 rounded-full overflow-hidden shrink-0 border border-purple-200">
+                        <Image
+                          src={admin.foto_profil as string}
+                          alt={admin.nama || 'Admin'}
+                          fill
+                          className="object-cover"
+                          unoptimized
+                        />
+                      </div>
+                    ) : (
+                      <span className="flex h-10 w-10 items-center justify-center rounded-full bg-brand-lavender text-sm font-semibold text-brand-primary shrink-0">
+                        {admin.nama?.trim().charAt(0).toUpperCase() || 'A'}
                       </span>
+                    )}
+                    <div className="min-w-0 flex-1">
+                      <p className="text-sm font-bold text-slate-900 truncate">{admin.nama}</p>
+                      {admin.email && (
+                        <p className="text-xs text-slate-500 truncate mt-0.5">{admin.email}</p>
+                      )}
+                      <div className="mt-1">
+                        <span className="inline-block rounded-full px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider bg-brand-lavender text-brand-primary border border-brand-primary/20">
+                          Administrator
+                        </span>
+                      </div>
                     </div>
                   </div>
 

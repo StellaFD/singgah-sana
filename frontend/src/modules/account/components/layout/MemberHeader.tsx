@@ -92,12 +92,15 @@ export function MemberHeader() {
           </button>
           {open && (
             <div className="menu" role="menu" aria-label="Menu akun">
-              <div className="menu-head">
-                <strong>{user.nama}</strong>
-                <span>{user.email}</span>
-                <span className="badge badge-brand" style={{ marginTop: 6, width: 'fit-content', fontSize: '10px', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
-                  {roleLabel}
-                </span>
+              <div className="menu-head" style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                <Avatar nama={user.nama} fotoUrl={user.fotoUrl} size={40} />
+                <div style={{ minWidth: 0, flex: 1 }}>
+                  <strong>{user.nama}</strong>
+                  <span>{user.email}</span>
+                  <span className="badge badge-brand" style={{ marginTop: 6, width: 'fit-content', fontSize: '10px', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
+                    {roleLabel}
+                  </span>
+                </div>
               </div>
               <div className="menu-mobile-only">
                 {navItems.map((n) => (

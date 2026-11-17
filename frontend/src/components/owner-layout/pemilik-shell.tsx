@@ -1,6 +1,7 @@
 'use client';
 
 import Link from 'next/link';
+import Image from 'next/image';
 import { usePathname, useRouter } from 'next/navigation';
 import { useEffect, useRef, useState, type ReactNode } from 'react';
 import {
@@ -154,9 +155,21 @@ export function PemilikShell({ children }: { children: ReactNode }) {
                     aria-haspopup="menu"
                     aria-label="Menu akun"
                   >
-                    <span className="flex h-10 w-10 items-center justify-center rounded-full bg-brand-soft text-sm font-semibold text-brand shrink-0">
-                      {initials(session.user.nama)}
-                    </span>
+                    {session.user.foto_profil ? (
+                      <div className="relative w-10 h-10 rounded-full overflow-hidden shrink-0 border border-purple-200">
+                        <Image
+                          src={session.user.foto_profil}
+                          alt={session.user.nama}
+                          fill
+                          className="object-cover"
+                          unoptimized
+                        />
+                      </div>
+                    ) : (
+                      <span className="flex h-10 w-10 items-center justify-center rounded-full bg-brand-soft text-sm font-semibold text-brand shrink-0">
+                        {initials(session.user.nama)}
+                      </span>
+                    )}
                     <span className="text-sm font-semibold text-ink max-w-[140px] truncate hidden sm:inline">
                       {session.user.nama}
                     </span>
@@ -174,15 +187,32 @@ export function PemilikShell({ children }: { children: ReactNode }) {
                       role="menu"
                       aria-label="Menu akun"
                     >
-                      <div className="px-3 py-2.5 border-b border-line mb-1">
-                        <p className="text-sm font-bold text-ink truncate">{session.user.nama}</p>
-                        {session.user.email && (
-                          <p className="text-xs text-ink-muted truncate mt-0.5">{session.user.email}</p>
-                        )}
-                        <div className="mt-1.5">
-                          <span className="inline-block rounded-full px-2.5 py-0.5 text-[10px] font-bold uppercase tracking-wider bg-brand-soft text-brand border border-brand/20">
-                            Pemilik Kos
+                      <div className="px-3 py-2.5 border-b border-line mb-1 flex items-center gap-3">
+                        {session.user.foto_profil ? (
+                          <div className="relative w-10 h-10 rounded-full overflow-hidden shrink-0 border border-purple-200">
+                            <Image
+                              src={session.user.foto_profil}
+                              alt={session.user.nama}
+                              fill
+                              className="object-cover"
+                              unoptimized
+                            />
+                          </div>
+                        ) : (
+                          <span className="flex h-10 w-10 items-center justify-center rounded-full bg-brand-soft text-sm font-semibold text-brand shrink-0">
+                            {initials(session.user.nama)}
                           </span>
+                        )}
+                        <div className="min-w-0 flex-1">
+                          <p className="text-sm font-bold text-ink truncate">{session.user.nama}</p>
+                          {session.user.email && (
+                            <p className="text-xs text-ink-muted truncate mt-0.5">{session.user.email}</p>
+                          )}
+                          <div className="mt-1">
+                            <span className="inline-block rounded-full px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider bg-brand-soft text-brand border border-brand/20">
+                              Pemilik Kos
+                            </span>
+                          </div>
                         </div>
                       </div>
 

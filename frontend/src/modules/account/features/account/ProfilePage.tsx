@@ -49,6 +49,7 @@ export default function ProfilePage() {
   const save = async (v: V) => {
     const u = await accountApi.updateProfile({ nama: v.nama.trim(), telepon: v.telepon.replace(/[\s-]/g, "") });
     setUser(u);
+    if (typeof window !== "undefined") window.dispatchEvent(new Event("ss:auth-changed"));
     form.reset({ nama: u.nama, telepon: u.telepon });
     toast.show({ tone: "success", message: "Perubahan profil berhasil disimpan." });
   };
@@ -73,6 +74,7 @@ export default function ProfilePage() {
     try {
       const updated = await accountApi.deletePhoto();
       setUser(updated);
+      if (typeof window !== "undefined") window.dispatchEvent(new Event("ss:auth-changed"));
       toast.show({ tone: "success", message: "Foto profil dihapus." });
     } catch (err) {
       toast.show({ tone: "error", message: errorMessage(err, "Gagal menghapus foto profil.") });
@@ -161,7 +163,9 @@ function PhotoDialog({ onClose }: { onClose: () => void }) {
     if (!file) { setError("Pilih foto terlebih dahulu."); return; }
     setBusy(true);
     try {
-      setUser(await accountApi.uploadPhoto(file));
+      const updated = await accountApi.uploadPhoto(file);
+      setUser(updated);
+      if (typeof window !== "undefined") window.dispatchEvent(new Event("ss:auth-changed"));
       toast.show({ tone: "success", message: "Foto profil diperbarui." });
       onClose();
     } catch (e) {

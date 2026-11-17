@@ -2,7 +2,7 @@
 
 import { AccountLayout } from "../../components/layout/AccountLayout";
 import { ButtonLink } from "../../components/ui/Button";
-import { Card, PageHeading } from "../../components/ui/Display";
+import { Avatar, Card, PageHeading } from "../../components/ui/Display";
 import { Alert, ErrorState, Skeleton } from "../../components/ui/Feedback";
 import { Link } from "../../components/ui/Link";
 import { formatTime } from "../../lib/format";
@@ -30,14 +30,20 @@ export default function SummaryPage() {
 
   return (
     <AccountLayout>
-      <PageHeading title={`Halo, ${first}.`} description={pageDescription} />
+      <div className="summary-hero-row" style={{ display: 'flex', alignItems: 'center', gap: '16px', marginBottom: '24px' }}>
+        <Avatar nama={user?.nama || ''} fotoUrl={user?.fotoUrl} size={64} />
+        <div>
+          <PageHeading title={`Halo, ${first}.`} description={pageDescription} />
+          {isOwner && <div className="badge badge-brand" style={{ marginTop: '6px', width: 'fit-content' }}>Akun Pemilik Kos</div>}
+          {isAdmin && <div className="badge badge-brand" style={{ marginTop: '6px', width: 'fit-content' }}>Akun Administrator</div>}
+          {isSeeker && <div className="badge badge-brand" style={{ marginTop: '6px', width: 'fit-content' }}>Akun Pencari Kos</div>}
+        </div>
+      </div>
       {redirectNotice === "role_mismatch" && (
         <Alert tone="info">
           Halaman yang sebelumnya ingin dibuka memerlukan hak akses peran yang berbeda. Anda telah diarahkan ke ringkasan akun Anda.
         </Alert>
       )}
-      {isOwner && <div className="badge badge-brand mb-4">Akun Pemilik Kos</div>}
-      {isAdmin && <div className="badge badge-brand mb-4">Akun Administrator</div>}
 
       {s.status === "loading" && !s.data && (
         <div aria-busy="true">
