@@ -46,7 +46,7 @@ const Button = React.forwardRef<HTMLButtonElement, ButtonProps>(function Button(
     ghost:
       'bg-transparent text-ink hover:bg-surface-muted active:bg-surface-border focus-visible:ring-brand-primary focus:ring-brand-primary',
     danger:
-      'bg-red-600 text-white hover:bg-red-700 active:bg-red-800 focus-visible:ring-red-500 focus:ring-red-500',
+      'bg-red-50 text-red-600 border border-red-200 hover:bg-red-100 hover:border-red-300 active:bg-red-200 focus-visible:ring-red-500 focus:ring-red-500',
   };
 
   return (

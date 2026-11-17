@@ -54,7 +54,12 @@ export function ConfirmDialog({
         <Button variant="secondary" onClick={onCancel} disabled={loading}>
           {cancelLabel}
         </Button>
-        <Button variant={tone === 'danger' ? 'danger' : 'primary'} onClick={onConfirm} loading={loading}>
+        <Button
+          variant={tone === 'danger' ? 'danger' : 'primary'}
+          className={tone === 'danger' ? '!bg-red-600 !text-white hover:!bg-red-700 border-transparent shadow-sm' : undefined}
+          onClick={onConfirm}
+          loading={loading}
+        >
           {confirmLabel}
         </Button>
       </div>
