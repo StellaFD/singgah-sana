@@ -131,7 +131,11 @@ export default function MessagesPage() {
             </ul>
           </aside>
           {selected ? (
-            <Thread key={selected.id} conv={selected} onActivity={() => { convs.reload(); summary?.reload(); }} />
+            <Thread key={selected.id} conv={selected} onActivity={() => { convs.reload(); summary?.reload(); }} onOpened={() => summary?.reload()} />
+          ) : selectedId ? (
+            <Card className="chat chat-placeholder">
+              <p className="muted">Percakapan ini sudah tidak tersedia, mungkin karena kos terkait telah dihapus. Pilih percakapan lain dari daftar.</p>
+            </Card>
           ) : (
             <Card className="chat chat-placeholder"><p className="muted">Pilih percakapan untuk membaca pesan.</p></Card>
           )}
@@ -141,7 +145,7 @@ export default function MessagesPage() {
   );
 }
 
-function Thread({ conv, onActivity }: { conv: Percakapan; onActivity: () => void }) {
+function Thread({ conv, onActivity, onOpened }: { conv: Percakapan; onActivity: () => void; onOpened: () => void }) {
   const [hasMore, setHasMore] = useState(false);
   const oldestCursorRef = useRef<string | null>(null);
   const msgs = useAsync(async (signal) => {
@@ -230,6 +234,15 @@ function Thread({ conv, onActivity }: { conv: Percakapan; onActivity: () => void
   }, [conv.id, setMsgsData]);
 
   useEffect(() => { endRef.current?.scrollIntoView({ block: "nearest" }); }, [local.length, msgs.status]);
+
+  // Membuka percakapan menandai notifikasinya dibaca di server; segarkan jumlah di lonceng
+  const openedRef = useRef(false);
+  useEffect(() => {
+    if (msgs.status === "success" && !openedRef.current) {
+      openedRef.current = true;
+      onOpened();
+    }
+  }, [msgs.status, onOpened]);
 
   const loadOlderMessages = async () => {
     const cursor = oldestCursorRef.current;

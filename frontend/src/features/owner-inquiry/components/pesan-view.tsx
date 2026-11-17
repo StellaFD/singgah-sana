@@ -184,6 +184,10 @@ export function PesanView() {
           <div className="min-w-0 border-t border-line pt-6 lg:border-l lg:border-t-0 lg:pl-6 lg:pt-0">
             {selected ? (
               <InquiryThread key={selected._id} inquiry={selected} onReplied={onReplied} />
+            ) : searchParams?.get('id') ? (
+              <p className="text-sm text-ink-muted">
+                Percakapan ini sudah tidak tersedia, mungkin karena kos terkait telah dihapus. Pilih percakapan lain dari daftar.
+              </p>
             ) : (
               <p className="text-sm text-ink-muted">Pilih percakapan untuk melihat isinya.</p>
             )}

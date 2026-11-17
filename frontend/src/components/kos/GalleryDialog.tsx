@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useState, useEffect, useCallback, useRef } from 'react';
-import Image from 'next/image';
+import FallbackImage from './FallbackImage';
 import { X, ChevronLeft, ChevronRight } from 'lucide-react';
 
 export interface GalleryDialogProps {
@@ -145,7 +145,7 @@ export default function GalleryDialog({
       {/* Main Image Area */}
       <div className="relative w-full h-full max-h-[85vh] max-w-6xl mx-auto flex items-center justify-center p-4">
         <div className="relative w-full h-full">
-          <Image
+          <FallbackImage
             src={currentPhoto}
             alt={currentCaption}
             fill

@@ -125,8 +125,20 @@ export function InquiryThread({ inquiry, onReplied }: InquiryThreadProps) {
   }, [inquiry._id, inquiry.updatedAt]);
 
   // Bangun daftar pesan berurutan: jika ada detail riwayat_pesan gunakan itu, jika belum fallback ke format legacy
+  // Pesan yang baru dikirim (dari onReplied) langsung digabung tanpa menunggu polling detail.
+  // Hanya pesan yang lebih baru dari pesan terakhir di detail, karena detail dipaginasi (50 terakhir).
+  const lastLoadedAt = detail?.riwayat_pesan?.length
+    ? Date.parse(detail.riwayat_pesan[detail.riwayat_pesan.length - 1].createdAt || '') || 0
+    : 0;
   const messages: ChatMessage[] = detail?.riwayat_pesan?.length
-    ? detail.riwayat_pesan
+    ? [
+        ...detail.riwayat_pesan,
+        ...(inquiry.pesan_list || []).filter(
+          (sent) =>
+            !detail.riwayat_pesan.some((m) => m._id === sent._id) &&
+            (Date.parse(sent.createdAt || '') || 0) > lastLoadedAt
+        ),
+      ]
     : [
         {
           _id: `${inquiry._id}-0`,
