@@ -2,7 +2,7 @@
 
 import React, { useState, useEffect, useMemo, useCallback, Suspense, useRef } from 'react';
 import { useRouter, useSearchParams, usePathname } from 'next/navigation';
-import { Search, SlidersHorizontal, Map, Grid } from 'lucide-react';
+import { Search, SlidersHorizontal, Map, Grid, ChevronDown } from 'lucide-react';
 import Button from '@/components/ui/Button';
 import Pagination from '@/components/ui/Pagination';
 import KosGrid from '@/components/kos/KosGrid';
@@ -264,21 +264,24 @@ function JelajahContent() {
           {/* Tombol Aksi: Filter Modal, Urutkan & Tampilan Grid/Peta */}
           <div className="flex flex-wrap items-center gap-3 w-full md:w-auto justify-between md:justify-end">
             {/* Kontrol Sorting */}
-            <div className="flex items-center gap-1.5">
+            <div className="flex items-center gap-2">
               <label htmlFor="jelajah-sort" className="text-xs font-medium text-ink-muted shrink-0 hidden sm:inline">
                 Urutkan:
               </label>
-              <select
-                id="jelajah-sort"
-                value={sortParam}
-                onChange={(e) => updateQuery({ sort: e.target.value })}
-                className="bg-surface-subtle border border-surface-border text-xs font-medium text-ink rounded-xl px-3 py-2.5 focus:outline-none focus:ring-2 focus:ring-brand-primary cursor-pointer"
-              >
-                <option value="terbaru">Terbaru</option>
-                <option value="harga_asc">Harga Terendah</option>
-                <option value="harga_desc">Harga Tertinggi</option>
-                <option value="kamar_banyak">Sisa Kamar</option>
-              </select>
+              <div className="relative inline-flex items-center">
+                <select
+                  id="jelajah-sort"
+                  value={sortParam}
+                  onChange={(e) => updateQuery({ sort: e.target.value })}
+                  className="appearance-none bg-white border border-surface-border text-xs font-medium text-ink rounded-xl pl-3.5 pr-9 py-2.5 focus:outline-none focus:ring-2 focus:ring-brand-primary cursor-pointer shadow-xs"
+                >
+                  <option value="terbaru">Terbaru</option>
+                  <option value="harga_asc">Harga Terendah</option>
+                  <option value="harga_desc">Harga Tertinggi</option>
+                  <option value="kamar_banyak">Sisa Kamar</option>
+                </select>
+                <ChevronDown className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 text-ink-muted pointer-events-none" />
+              </div>
             </div>
 
             <Button
@@ -348,13 +351,18 @@ function JelajahContent() {
             ) : mapError ? (
               <div className="absolute inset-0 bg-white/90 flex flex-col items-center justify-center gap-3 p-6 text-center z-20">
                 <p className="text-sm font-medium text-red-600">{mapError}</p>
-                <Button
-                  variant="secondary"
-                  size="sm"
-                  onClick={() => setMapRetryTrigger((prev) => prev + 1)}
-                >
-                  Coba Lagi
-                </Button>
+                <div className="flex flex-wrap items-center justify-center gap-2">
+                  <Button
+                    variant="secondary"
+                    size="sm"
+                    onClick={() => setMapRetryTrigger((prev) => prev + 1)}
+                  >
+                    Coba Lagi
+                  </Button>
+                  <Button variant="secondary" size="sm" onClick={handleResetAll}>
+                    Atur Ulang Pencarian
+                  </Button>
+                </div>
               </div>
             ) : mapMarkers.length === 0 ? (
               <div className="absolute inset-0 bg-white/90 flex flex-col items-center justify-center gap-2 p-6 text-center z-20">

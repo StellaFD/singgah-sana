@@ -4,7 +4,51 @@ const { getCloudinaryOptions, storageError } = require('../config/mediaStorage')
 
 function isManagedPublicId(publicId) {
   return typeof publicId === 'string' &&
-    /^singgah-sana\/(development|production|test)\/kos\/[a-f\d]{24}\/[a-f\d-]{36}$/.test(publicId);
+    /^singgah-sana\/(development|production|test)\/(kos|avatars)\/[a-f\d]{24}\/[a-f\d-]{36}$/.test(publicId);
+}
+
+async function uploadAvatarBuffer(buffer, userId) {
+  const options = getCloudinaryOptions();
+  if (!/^[a-f\d]{24}$/.test(String(userId))) {
+    throw storageError('Identitas pengguna tidak valid.');
+  }
+  const environment = process.env.NODE_ENV === 'production' ? 'production'
+    : process.env.NODE_ENV === 'test' ? 'test' : 'development';
+  const publicId = `singgah-sana/${environment}/avatars/${userId}/${crypto.randomUUID()}`;
+  let uploaded;
+  try {
+    uploaded = await new Promise((resolve, reject) => {
+      const stream = cloudinary.uploader.upload_stream({
+        ...options,
+        resource_type: 'image',
+        public_id: publicId,
+        overwrite: false,
+        transformation: [
+          { width: 400, height: 400, crop: 'fill', gravity: 'face' },
+        ],
+        allowed_formats: ['jpg', 'jpeg', 'png', 'webp'],
+      }, (error, result) => error ? reject(error) : resolve(result));
+      stream.on('error', reject);
+      stream.end(buffer);
+    });
+  } catch {
+    throw storageError('Foto profil belum dapat diunggah ke penyimpanan. Coba lagi.');
+  }
+
+  let url;
+  try { url = new URL(uploaded.secure_url); } catch { /* Rejected below. */ }
+  if (!url || url.protocol !== 'https:' || url.hostname !== 'res.cloudinary.com' ||
+      url.username || url.password || url.port ||
+      !url.pathname.startsWith(`/${options.cloud_name}/image/upload/`) ||
+      uploaded.public_id !== publicId) {
+    await deleteImage({ publicId, cloudName: options.cloud_name }).catch(() => {});
+    throw storageError('Respons penyimpanan Cloudinary tidak valid.');
+  }
+
+  return {
+    url: url.href,
+    publicId,
+  };
 }
 
 async function deleteImage({ publicId, cloudName }) {
@@ -67,4 +111,4 @@ async function uploadImageBuffer(buffer, userId) {
   };
 }
 
-module.exports = { uploadImageBuffer, deleteImage };
+module.exports = { uploadImageBuffer, deleteImage, uploadAvatarBuffer };

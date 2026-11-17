@@ -1,9 +1,12 @@
 "use client";
 
+import { useState } from "react";
 import { Button } from "../../components/ui/Button";
 import { Field } from "../../components/ui/Field";
 import { Alert } from "../../components/ui/Feedback";
 import { Link } from "../../components/ui/Link";
+import { GoogleAuthButton } from "../../components/ui/GoogleAuthButton";
+import { RoleSelectionModal } from "../../components/ui/RoleSelectionModal";
 import { ApiError } from "../../lib/api/client";
 import { useForm } from "../../lib/hooks/useForm";
 import { navigate, useLocation } from "../../lib/router";
@@ -14,6 +17,7 @@ import {
   inferAuthRoleContext,
   resolvePostAuthRedirect,
   buildAuthLink,
+  safeInternalPath,
 } from "@/lib/authRedirect";
 
 interface V extends Record<string, string> {
@@ -27,7 +31,7 @@ const schema: Schema<V> = {
 };
 
 export default function LoginPage() {
-  const { login } = useAuth();
+  const { login, googleAuth } = useAuth();
   const { query } = useLocation();
   const form = useForm<V>({ email: "", password: "" }, schema);
   const expired = query.get("sesi") === "berakhir";
@@ -35,10 +39,64 @@ export default function LoginPage() {
   const nextParam = query.get("next");
   const roleContext = inferAuthRoleContext(query.get("role"), nextParam);
 
+  const [googleLoading, setGoogleLoading] = useState(false);
+  const [googleError, setGoogleError] = useState<string | null>(null);
+  const [pendingGoogleUser, setPendingGoogleUser] = useState<{
+    credential: string;
+    email: string;
+    nama: string;
+  } | null>(null);
+
+  const handleGoogleAuth = async (
+    credential: string,
+    chosenRole?: "pencari" | "pemilik"
+  ) => {
+    try {
+      setGoogleLoading(true);
+      setGoogleError(null);
+      const roleToSubmit =
+        chosenRole || (roleContext === "pemilik" ? "pemilik" : undefined);
+      const result = await googleAuth({ credential, role: roleToSubmit });
+
+      if (result.type === "need_role") {
+        setPendingGoogleUser({
+          credential,
+          email: result.data.email,
+          nama: result.data.nama,
+        });
+        return;
+      }
+
+      setPendingGoogleUser(null);
+      let target = resolvePostAuthRedirect(result.user.role, nextParam);
+      if (nextParam && target !== nextParam && safeInternalPath(nextParam)) {
+        const separator = target.includes("?") ? "&" : "?";
+        target = `${target}${separator}redirect_notice=role_mismatch`;
+      }
+      navigate(target, { replace: true, force: true });
+    } catch (e) {
+      if (e instanceof ApiError && e.code === "ACCOUNT_SUSPENDED") {
+        navigate("/dibatasi", { replace: true, force: true });
+        return;
+      }
+      setGoogleError(
+        e instanceof Error
+          ? e.message
+          : "Gagal masuk dengan Google. Silakan coba lagi."
+      );
+    } finally {
+      setGoogleLoading(false);
+    }
+  };
+
   const onSubmit = form.submit(async (v) => {
     try {
       const user = await login({ email: v.email.trim(), password: v.password });
-      const target = resolvePostAuthRedirect(user.role, nextParam);
+      let target = resolvePostAuthRedirect(user.role, nextParam);
+      if (nextParam && target !== nextParam && safeInternalPath(nextParam)) {
+        const separator = target.includes("?") ? "&" : "?";
+        target = `${target}${separator}redirect_notice=role_mismatch`;
+      }
       navigate(target, { replace: true, force: true });
     } catch (e) {
       if (e instanceof ApiError && e.code === "ACCOUNT_SUSPENDED") {
@@ -78,23 +136,53 @@ export default function LoginPage() {
   });
 
   return (
-    <AuthCard title={title} description={description} onSubmit={onSubmit} formRef={form.formRef}>
-      {badge && <span className="badge badge-brand">{badge}</span>}
-      {expired && !form.formError && <Alert>Sesi kamu berakhir. Masuk kembali untuk melanjutkan.</Alert>}
-      {form.formError && <Alert tone="error">{form.formError}</Alert>}
-      <Field label="Alamat email" type="email" autoComplete="email" placeholder="nama@email.com" {...form.field("email")} />
-      <Field label="Kata sandi" type="password" autoComplete="current-password" placeholder="Kata sandi" {...form.field("password")} />
-      <div style={{ textAlign: "right", marginTop: "-8px", marginBottom: "12px" }}>
-        <Link to="/lupa-sandi" className="link small">Lupa kata sandi?</Link>
-      </div>
-      <Button type="submit" block loading={form.submitting}>Masuk</Button>
-      {roleContext === "admin" ? (
-        <p className="auth-alt muted small">Pendaftaran akun administrator tidak tersedia secara publik.</p>
-      ) : (
-        <p className="auth-alt">
-          Belum punya akun? <Link to={registerLink} className="link">Daftar</Link>
-        </p>
+    <>
+      <AuthCard title={title} description={description} onSubmit={onSubmit} formRef={form.formRef}>
+        {badge && <span className="badge badge-brand">{badge}</span>}
+        {expired && !form.formError && <Alert>Sesi kamu berakhir. Masuk kembali untuk melanjutkan.</Alert>}
+        {form.formError && <Alert tone="error">{form.formError}</Alert>}
+        {googleError && <Alert tone="error">{googleError}</Alert>}
+
+        {roleContext !== "admin" && (
+          <>
+            <GoogleAuthButton
+              onSuccess={(cred) => handleGoogleAuth(cred)}
+              onError={(err) => setGoogleError(err.message)}
+              disabled={form.submitting || googleLoading}
+              text="continue_with"
+            />
+            <div className="auth-divider">
+              <span>atau masuk dengan email</span>
+            </div>
+          </>
+        )}
+
+        <Field label="Alamat email" type="email" autoComplete="email" placeholder="nama@email.com" {...form.field("email")} />
+        <Field label="Kata sandi" type="password" autoComplete="current-password" placeholder="Kata sandi" {...form.field("password")} />
+        <div style={{ textAlign: "right", marginTop: "-8px", marginBottom: "12px" }}>
+          <Link to="/lupa-sandi" className="link small">Lupa kata sandi?</Link>
+        </div>
+        <Button type="submit" block loading={form.submitting || googleLoading}>Masuk</Button>
+        {roleContext === "admin" ? (
+          <p className="auth-alt muted small">Pendaftaran akun administrator tidak tersedia secara publik.</p>
+        ) : (
+          <p className="auth-alt">
+            Belum punya akun? <Link to={registerLink} className="link">Daftar</Link>
+          </p>
+        )}
+      </AuthCard>
+
+      {pendingGoogleUser && (
+        <RoleSelectionModal
+          userName={pendingGoogleUser.nama}
+          userEmail={pendingGoogleUser.email}
+          loading={googleLoading}
+          onSelectRole={async (r) => {
+            await handleGoogleAuth(pendingGoogleUser.credential, r);
+          }}
+          onClose={() => setPendingGoogleUser(null)}
+        />
       )}
-    </AuthCard>
+    </>
   );
 }

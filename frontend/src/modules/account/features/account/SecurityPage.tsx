@@ -43,7 +43,9 @@ export default function SecurityPage() {
       <Card className="action-card">
         <h2 className="h3">Hapus akun</h2>
         <p className="muted">Menghapus akun menghilangkan akses ke favorit dan percakapanmu. Periksa dampaknya sebelum melanjutkan.</p>
-        <Button variant="secondary" disabled title="Penghapusan akun belum diaktifkan">Tinjau penghapusan akun</Button>
+        <div>
+          <Button variant="secondary" onClick={() => setOpen("delete")}>Tinjau penghapusan akun</Button>
+        </div>
       </Card>
       {open === "password" && <ChangePasswordDialog onClose={() => setOpen(null)} />}
       {open === "email" && <ChangeEmailDialog onClose={() => setOpen(null)} />}
@@ -72,7 +74,7 @@ function ChangePasswordDialog({ onClose }: { onClose: () => void }) {
       <form className="dialog-form" onSubmit={onSubmit} noValidate ref={form.formRef}>
         {form.formError && <Alert tone="error">{form.formError}</Alert>}
         <Field label="Kata sandi saat ini" type="password" autoComplete="current-password" {...form.field("passwordSaatIni")} />
-        <Field label="Kata sandi baru" type="password" autoComplete="new-password" helper="Minimal 15 karakter, maksimal 72 byte." {...form.field("passwordBaru")} />
+        <Field label="Kata sandi baru" type="password" autoComplete="new-password" helper="Minimal 8 karakter. Boleh menggunakan huruf, angka, dan simbol." {...form.field("passwordBaru")} />
         <Field label="Konfirmasi sandi baru" type="password" autoComplete="new-password" {...form.field("konfirmasi")} />
         <div className="dialog-actions">
           <Button variant="secondary" onClick={onClose}>Batal</Button>

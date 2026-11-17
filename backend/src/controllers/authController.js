@@ -1,6 +1,8 @@
 const crypto = require('crypto');
 const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
+const fs = require('fs');
+const path = require('path');
 const User = require('../models/User');
 const { getJwtSecret } = require('../config/jwt');
 const { getMailConfig } = require('../config/mail');
@@ -8,6 +10,24 @@ const { sendPasswordResetEmail, sendVerificationEmail } = require('../services/e
 const { checkForgotRateLimit, checkResendVerificationRateLimit } = require('../middlewares/recoveryRateLimit');
 const Session = require('../models/Session');
 const { createSession } = require('../middlewares/sessionMiddleware');
+const { uploadAvatarBuffer } = require('../services/cloudinaryStorage');
+const { OAuth2Client } = require('google-auth-library');
+
+function validateMagicBytes(buffer, mimetype) {
+  if (!buffer || buffer.length < 12) return false;
+  if (mimetype === 'image/jpeg' || mimetype === 'image/jpg') {
+    return buffer[0] === 0xFF && buffer[1] === 0xD8 && buffer[2] === 0xFF;
+  }
+  if (mimetype === 'image/png') {
+    return buffer[0] === 0x89 && buffer[1] === 0x50 && buffer[2] === 0x4E && buffer[3] === 0x47;
+  }
+  if (mimetype === 'image/webp') {
+    const isRiff = buffer.subarray(0, 4).toString('ascii') === 'RIFF';
+    const isWebp = buffer.subarray(8, 12).toString('ascii') === 'WEBP';
+    return isRiff && isWebp;
+  }
+  return false;
+}
 
 const userDto = (user) => ({
   _id: user._id,
@@ -44,8 +64,8 @@ const register = async (req, res, next) => {
       });
     }
 
-    if (typeof password !== 'string' || password.length < 15 || Buffer.byteLength(password, 'utf8') > 72) {
-      return res.status(422).json({ success: false, message: 'Kata sandi minimal 15 karakter dan maksimal 72 byte.' });
+    if (typeof password !== 'string' || password.length < 8 || Buffer.byteLength(password, 'utf8') > 72) {
+      return res.status(422).json({ success: false, message: 'Kata sandi minimal 8 karakter dan maksimal 72 karakter.' });
     }
     let userRole = typeof role === 'string' ? role.toLowerCase() : 'pencari';
     if (userRole === 'admin') {
@@ -67,14 +87,26 @@ const register = async (req, res, next) => {
       return res.status(400).json({
         success: false,
         message: 'Email sudah terdaftar, silakan gunakan email lain atau login',
+        errors: { email: ['Email sudah terdaftar pada akun lain.'] },
+      });
+    }
+
+    const phone = nomor_telepon.trim();
+    const existingPhone = await User.findOne({ nomor_telepon: phone });
+    if (existingPhone) {
+      return res.status(409).json({
+        success: false,
+        code: 'CONFLICT',
+        message: 'Nomor telepon sudah terdaftar, silakan gunakan nomor lain.',
+        errors: { telepon: ['Nomor kontak sudah terdaftar pada akun lain.'] },
       });
     }
 
     const user = await User.create({
-      nama,
+      nama: nama.trim(),
       email,
       password,
-      nomor_telepon,
+      nomor_telepon: phone,
       role: userRole,
     });
 
@@ -175,7 +207,19 @@ const updateProfile = async (req, res, next) => {
     if (nomor_telepon !== undefined && (typeof nomor_telepon !== 'string' || !/^(\+62|62|0)8\d{7,12}$/.test(nomor_telepon))) errors.telepon = ['Nomor kontak tidak valid.'];
     if (Object.keys(errors).length) return res.status(422).json({ success: false, code: 'VALIDATION_ERROR', message: 'Periksa kembali isian profil.', errors });
     if (nama) user.nama = nama.trim();
-    if (nomor_telepon) user.nomor_telepon = nomor_telepon;
+    if (nomor_telepon) {
+      const trimmedPhone = nomor_telepon.trim();
+      const existingPhone = await User.findOne({ nomor_telepon: trimmedPhone, _id: { $ne: req.user._id } });
+      if (existingPhone) {
+        return res.status(409).json({
+          success: false,
+          code: 'CONFLICT',
+          message: 'Nomor telepon sudah terdaftar pada akun lain.',
+          errors: { telepon: ['Nomor kontak sudah digunakan oleh akun lain.'] },
+        });
+      }
+      user.nomor_telepon = trimmedPhone;
+    }
 
     const updatedUser = await user.save();
 
@@ -193,8 +237,8 @@ const changePassword = async (req, res, next) => {
   try {
     const { password_lama, password_baru } = req.body;
     if (typeof password_lama !== 'string' || typeof password_baru !== 'string' ||
-        password_baru.length < 15 || Buffer.byteLength(password_baru, 'utf8') > 72 || password_lama === password_baru) {
-      return res.status(422).json({ success: false, message: 'Gunakan sandi baru minimal 15 karakter, maksimal 72 byte, dan berbeda dari sandi lama.' });
+        password_baru.length < 8 || Buffer.byteLength(password_baru, 'utf8') > 72 || password_lama === password_baru) {
+      return res.status(422).json({ success: false, message: 'Gunakan sandi baru minimal 8 karakter, maksimal 72 karakter, dan berbeda dari sandi lama.' });
     }
     const user = await User.findById(req.user._id).select('+password +token_version');
     if (!await user.matchPassword(password_lama)) return res.status(422).json({ success: false, message: 'Kata sandi lama tidak sesuai.' });
@@ -326,13 +370,13 @@ const resetPassword = async (req, res, next) => {
 
     if (
       typeof password !== 'string' ||
-      password.length < 15 ||
+      password.length < 8 ||
       Buffer.byteLength(password, 'utf8') > 72
     ) {
       return res.status(422).json({
         success: false,
         code: 'VALIDATION_ERROR',
-        message: 'Kata sandi minimal 15 karakter dan maksimal 72 byte.',
+        message: 'Kata sandi minimal 8 karakter dan maksimal 72 karakter.',
       });
     }
 
@@ -603,11 +647,284 @@ const resendVerification = async (req, res, next) => {
   }
 };
 
+const uploadProfilePhoto = async (req, res, next) => {
+  try {
+    if (!req.file || !req.file.buffer) {
+      return res.status(400).json({ success: false, message: 'Berkas foto tidak ditemukan.' });
+    }
+    const { buffer, mimetype, size } = req.file;
+    if (size > 2 * 1024 * 1024) {
+      return res.status(422).json({ success: false, message: 'Ukuran foto maksimal 2 MB.' });
+    }
+    const allowed = ['image/jpeg', 'image/jpg', 'image/png', 'image/webp'];
+    if (!allowed.includes(mimetype) || !validateMagicBytes(buffer, mimetype)) {
+      return res.status(422).json({ success: false, message: 'Format berkas harus berupa JPG, PNG, atau WebP yang valid.' });
+    }
+
+    const user = await User.findById(req.user._id);
+    if (!user) {
+      return res.status(404).json({ success: false, message: 'Pengguna tidak ditemukan.' });
+    }
+
+    let photoUrl = '';
+    try {
+      const result = await uploadAvatarBuffer(buffer, user._id);
+      photoUrl = result.url;
+    } catch {
+      // Fallback ke penyimpanan lokal jika Cloudinary terkendala
+      const uploadAvatarsDir = path.join(__dirname, '../../uploads/avatars');
+      if (!fs.existsSync(uploadAvatarsDir)) {
+        fs.mkdirSync(uploadAvatarsDir, { recursive: true });
+      }
+      const ext = mimetype === 'image/png' ? '.png' : mimetype === 'image/webp' ? '.webp' : '.jpg';
+      const filename = `avatar-${user._id}-${Date.now()}${ext}`;
+      const localPath = path.join(uploadAvatarsDir, filename);
+      fs.writeFileSync(localPath, buffer);
+      photoUrl = `/uploads/avatars/${filename}`;
+    }
+
+    user.foto_profil = photoUrl;
+    await user.save();
+
+    res.status(200).json({
+      success: true,
+      message: 'Foto profil berhasil diperbarui.',
+      data: userDto(user),
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
+const deleteProfilePhoto = async (req, res, next) => {
+  try {
+    const user = await User.findById(req.user._id);
+    if (!user) return res.status(404).json({ success: false, message: 'Pengguna tidak ditemukan.' });
+    user.foto_profil = '';
+    await user.save();
+    res.status(200).json({
+      success: true,
+      message: 'Foto profil berhasil dihapus.',
+      data: userDto(user),
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
+const deleteAccount = async (req, res, next) => {
+  try {
+    const { password } = req.body || {};
+
+    if (!password) {
+      return res.status(422).json({
+        success: false,
+        code: 'VALIDATION_ERROR',
+        message: 'Masukkan kata sandi saat ini untuk konfirmasi penghapusan akun.',
+        errors: { password: ['Kata sandi wajib diisi.'] },
+      });
+    }
+
+    const user = await User.findById(req.user._id).select('+password');
+    if (!user) {
+      return res.status(404).json({ success: false, message: 'Pengguna tidak ditemukan.' });
+    }
+
+    const isMatch = await user.matchPassword(password);
+    if (!isMatch) {
+      return res.status(422).json({
+        success: false,
+        code: 'VALIDATION_ERROR',
+        message: 'Kata sandi saat ini tidak sesuai.',
+        errors: { password: ['Kata sandi saat ini tidak sesuai.'] },
+      });
+    }
+
+    // Role Safeguards
+    if (user.role === 'admin') {
+      const otherAdmins = await User.countDocuments({ role: 'admin', _id: { $ne: user._id } });
+      if (otherAdmins === 0) {
+        return res.status(403).json({
+          success: false,
+          code: 'FORBIDDEN',
+          message: 'Akun administrator tunggal tidak dapat dihapus.',
+        });
+      }
+    }
+
+    // Jika pemilik, nonaktifkan seluruh kos miliknya
+    if (user.role === 'pemilik') {
+      const Kos = require('../models/Kos');
+      await Kos.updateMany(
+        { pemilik_id: user._id },
+        { status_publikasi: 'inactive', status_verifikasi: 'archived' }
+      );
+    }
+
+    // Cascading Cleanup
+    const Favorit = require('../models/Favorit');
+    const Notifikasi = require('../models/Notifikasi');
+    const Session = require('../models/Session');
+
+    await Promise.all([
+      Favorit.deleteMany({ user_id: user._id }),
+      Notifikasi.deleteMany({ user_id: user._id }),
+      Session.deleteMany({ user_id: user._id }),
+    ]);
+
+    // Hapus dokumen pengguna secara fisik dari MongoDB Atlas
+    await User.findByIdAndDelete(user._id);
+
+    // Hapus cookie sesi dari browser
+    res.clearCookie('sid', {
+      httpOnly: true,
+      secure: process.env.NODE_ENV === 'production',
+      sameSite: 'lax',
+      path: '/',
+    });
+    res.clearCookie('ss.sid', {
+      httpOnly: true,
+      secure: process.env.NODE_ENV === 'production',
+      sameSite: 'lax',
+      path: '/',
+    });
+
+    return res.status(200).json({
+      success: true,
+      message: 'Akun Anda berhasil dihapus secara permanen.',
+      data: null,
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
+const googleAuth = async (req, res, next) => {
+  try {
+    const { credential, role } = req.body;
+    if (!credential || typeof credential !== 'string') {
+      return res.status(400).json({
+        success: false,
+        code: 'CREDENTIAL_REQUIRED',
+        message: 'Kredensial Google wajib disertakan.',
+      });
+    }
+
+    const clientId = process.env.GOOGLE_CLIENT_ID;
+    if (!clientId) {
+      return res.status(500).json({
+        success: false,
+        message: 'Konfigurasi Google Client ID belum disetel pada server.',
+      });
+    }
+
+    const googleClient = new OAuth2Client(clientId);
+    let payload;
+    try {
+      const ticket = await googleClient.verifyIdToken({
+        idToken: credential,
+        audience: clientId,
+      });
+      payload = ticket.getPayload();
+    } catch (err) {
+      return res.status(401).json({
+        success: false,
+        code: 'INVALID_GOOGLE_TOKEN',
+        message: 'Token Google tidak valid atau telah kedaluwarsa. Silakan coba lagi.',
+      });
+    }
+
+    if (!payload || !payload.email) {
+      return res.status(400).json({
+        success: false,
+        message: 'Gagal memperoleh informasi email dari akun Google Anda.',
+      });
+    }
+
+    const email = payload.email.trim().toLowerCase();
+    let user = await User.findOne({ email }).select('+token_version');
+
+    if (user) {
+      if (user.status === 'suspended') {
+        return res.status(403).json({
+          success: false,
+          code: 'ACCOUNT_SUSPENDED',
+          message: 'Akun Anda ditangguhkan.',
+        });
+      }
+
+      let shouldSave = false;
+      if (!user.google_id) {
+        user.google_id = payload.sub;
+        shouldSave = true;
+      }
+      if (!user.foto_profil && payload.picture) {
+        user.foto_profil = payload.picture;
+        shouldSave = true;
+      }
+      if (!user.email_verified_at && payload.email_verified) {
+        user.email_verified_at = new Date();
+        shouldSave = true;
+      }
+      if (shouldSave) {
+        await user.save();
+      }
+
+      await createSession(req, res, user._id, user.token_version || 0);
+
+      return res.status(200).json({
+        success: true,
+        message: 'Berhasil masuk dengan Google!',
+        data: userDto(user),
+      });
+    }
+
+    // Pengguna belum terdaftar
+    const validRoles = ['pencari', 'pemilik'];
+    if (!role || !validRoles.includes(role)) {
+      return res.status(200).json({
+        success: true,
+        code: 'NEED_ROLE',
+        message: 'Silakan pilih jenis akun untuk menyelesaikan pendaftaran.',
+        data: {
+          email,
+          nama: payload.name || 'Pengguna Google',
+          foto_profil: payload.picture || '',
+        },
+      });
+    }
+
+    user = new User({
+      nama: payload.name || 'Pengguna Google',
+      email,
+      role,
+      foto_profil: payload.picture || '',
+      google_id: payload.sub,
+      email_verified_at: payload.email_verified ? new Date() : null,
+    });
+    await user.save();
+
+    await createSession(req, res, user._id, user.token_version || 0);
+
+    return res.status(201).json({
+      success: true,
+      message: 'Pendaftaran dengan Google berhasil!',
+      data: userDto(user),
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
 module.exports = {
   register,
   login,
+  googleAuth,
   getMe,
   updateProfile,
+  uploadProfilePhoto,
+  deleteProfilePhoto,
+  deleteAccount,
   changePassword,
   forgotPassword,
   resetPassword,

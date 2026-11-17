@@ -22,14 +22,22 @@ const userSchema = new mongoose.Schema(
     },
     password: {
       type: String,
-      required: [true, 'Kata sandi wajib diisi'],
+      required: false,
       minlength: [6, 'Kata sandi minimal 6 karakter'],
       select: false,
     },
     nomor_telepon: {
       type: String,
-      required: [true, 'Nomor telepon/WhatsApp wajib diisi'],
+      required: false,
       trim: true,
+      unique: true,
+      sparse: true,
+    },
+    google_id: {
+      type: String,
+      default: null,
+      sparse: true,
+      index: true,
     },
     role: {
       type: String,
@@ -63,7 +71,7 @@ const userSchema = new mongoose.Schema(
 );
 
 userSchema.pre('save', async function (next) {
-  if (!this.isModified('password')) {
+  if (!this.isModified('password') || !this.password) {
     return next();
   }
   const salt = await bcrypt.genSalt(10);
@@ -72,6 +80,7 @@ userSchema.pre('save', async function (next) {
 });
 
 userSchema.methods.matchPassword = async function (enteredPassword) {
+  if (!this.password) return false;
   return await bcrypt.compare(enteredPassword, this.password);
 };
 

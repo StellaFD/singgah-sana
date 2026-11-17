@@ -1,6 +1,7 @@
 "use client";
 
-import { useId, type ReactNode } from "react";
+import { useId, useState, type ReactNode } from "react";
+import { Eye, EyeOff } from "lucide-react";
 
 interface Common {
   label: string;
@@ -39,18 +40,51 @@ function Wrapper({ id, label, required, error, helper, children }: { id: string;
 export function Field(props: Common & { type?: "text" | "email" | "password" | "tel"; inputMode?: "text" | "numeric" | "tel" | "email" }) {
   const { label, helper, error, required, onChange, type = "text", ...rest } = props;
   const { id, describedBy } = useIds(error, helper);
+  const [showPassword, setShowPassword] = useState(false);
+  const isPassword = type === "password";
+  const effectiveType = isPassword ? (showPassword ? "text" : "password") : type;
+
   return (
     <Wrapper id={id} label={label} required={required} error={error} helper={helper}>
-      <input
-        id={id}
-        type={type}
-        className="control"
-        aria-invalid={error ? true : undefined}
-        aria-describedby={describedBy}
-        aria-required={required || undefined}
-        onChange={(e) => onChange(e.target.value)}
-        {...rest}
-      />
+      <div style={isPassword ? { position: "relative", width: "100%" } : undefined}>
+        <input
+          id={id}
+          type={effectiveType}
+          className="control"
+          style={isPassword ? { paddingRight: "44px" } : undefined}
+          aria-invalid={error ? true : undefined}
+          aria-describedby={describedBy}
+          aria-required={required || undefined}
+          onChange={(e) => onChange(e.target.value)}
+          {...rest}
+        />
+        {isPassword && (
+          <button
+            type="button"
+            onClick={() => setShowPassword((prev) => !prev)}
+            aria-label={showPassword ? "Sembunyikan kata sandi" : "Tampilkan kata sandi"}
+            title={showPassword ? "Sembunyikan kata sandi" : "Tampilkan kata sandi"}
+            tabIndex={-1}
+            style={{
+              position: "absolute",
+              right: "12px",
+              top: "50%",
+              transform: "translateY(-50%)",
+              background: "transparent",
+              border: "none",
+              padding: "4px",
+              cursor: "pointer",
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "center",
+              color: "#64748b",
+              borderRadius: "6px",
+            }}
+          >
+            {showPassword ? <EyeOff className="w-5 h-5" aria-hidden="true" /> : <Eye className="w-5 h-5" aria-hidden="true" />}
+          </button>
+        )}
+      </div>
     </Wrapper>
   );
 }

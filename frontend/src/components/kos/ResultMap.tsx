@@ -17,6 +17,7 @@ export interface ResultMapProps {
   onSelectKos?: (kos: KosMapMarker) => void;
   className?: string;
   isTruncated?: boolean;
+  showPreviewCard?: boolean;
 }
 
 function isValidCoordinate(lat: unknown, lng: unknown): boolean {
@@ -38,6 +39,7 @@ export default function ResultMap({
   onSelectKos,
   className = '',
   isTruncated = false,
+  showPreviewCard = true,
 }: ResultMapProps) {
   const mapContainerRef = useRef<HTMLDivElement>(null);
   const mapInstanceRef = useRef<LeafletMap | null>(null);
@@ -182,13 +184,21 @@ export default function ResultMap({
       markersMapRef.current.set(kosId, marker);
     });
 
-    // Auto-fit bounds hanya bila himpunan ID berubah
-    if (validKosList.length > 0 && currentIdsKey !== previousIdsKeyRef.current) {
+    // Auto-fit bounds atau setView jika 1 item
+    if (validKosList.length === 1) {
+      previousIdsKeyRef.current = currentIdsKey;
+      map.setView(
+        [validKosList[0].koordinat.latitude, validKosList[0].koordinat.longitude],
+        16
+      );
+      setTimeout(() => map.invalidateSize(), 100);
+    } else if (validKosList.length > 1 && currentIdsKey !== previousIdsKeyRef.current) {
       previousIdsKeyRef.current = currentIdsKey;
       const bounds = L.latLngBounds(
         validKosList.map((k) => [k.koordinat.latitude, k.koordinat.longitude])
       );
       map.fitBounds(bounds, { padding: MAP_CONFIG.boundsPadding, maxZoom: 16 });
+      setTimeout(() => map.invalidateSize(), 100);
     }
   }, [validKosList, activeKosId]);
 
@@ -203,7 +213,7 @@ export default function ResultMap({
   }, [activeKosId, validKosList]);
 
   return (
-    <div className={`relative w-full h-full min-h-[400px] z-0 isolate overflow-hidden font-inter ${className}`}>
+    <div className={`relative w-full h-full min-h-[250px] z-0 isolate overflow-hidden font-inter ${className}`}>
       {/* Kontainer Peta Leaflet */}
       <div ref={mapContainerRef} className="w-full h-full z-0" />
 
@@ -239,8 +249,8 @@ export default function ResultMap({
         </div>
       )}
 
-      {/* Kartu Pratinjau Kos Terpilih di Peta */}
-      {selectedKos && (
+      {/* Kartu Pratinjau Kos Terpilih di Peta (hanya jika showPreviewCard aktif) */}
+      {showPreviewCard && selectedKos && (
         <div className="absolute bottom-6 left-6 z-20 max-w-xs w-full bg-white rounded-2xl border border-surface-border shadow-xl p-3 animate-in fade-in slide-in-from-bottom-2 duration-150">
           <button
             type="button"

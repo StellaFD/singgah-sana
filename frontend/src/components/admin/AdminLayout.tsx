@@ -12,6 +12,12 @@ import {
   Menu,
   Users,
   X,
+  ChevronDown,
+  Shield,
+  ClipboardCheck,
+  User as UserIcon,
+  KeyRound,
+  Bell,
   type LucideIcon,
 } from 'lucide-react';
 import { cn } from '../../lib/cn';
@@ -103,8 +109,32 @@ export default function AdminLayout({
   pathname,
 }: AdminLayoutProps) {
   const [isMobileNavOpen, setIsMobileNavOpen] = useState(false);
+  const [profileDropdownOpen, setProfileDropdownOpen] = useState(false);
+  const dropdownRef = useRef<HTMLDivElement>(null);
   const menuButtonRef = useRef<HTMLButtonElement>(null);
   const closeButtonRef = useRef<HTMLButtonElement>(null);
+
+  // Tutup dropdown saat klik di luar
+  useEffect(() => {
+    function handleClickOutside(event: MouseEvent) {
+      if (dropdownRef.current && !dropdownRef.current.contains(event.target as Node)) {
+        setProfileDropdownOpen(false);
+      }
+    }
+    function handleKeyDown(event: KeyboardEvent) {
+      if (event.key === 'Escape') {
+        setProfileDropdownOpen(false);
+      }
+    }
+    if (profileDropdownOpen) {
+      document.addEventListener('mousedown', handleClickOutside);
+      document.addEventListener('keydown', handleKeyDown);
+    }
+    return () => {
+      document.removeEventListener('mousedown', handleClickOutside);
+      document.removeEventListener('keydown', handleKeyDown);
+    };
+  }, [profileDropdownOpen]);
 
   useEffect(() => {
     if (!isMobileNavOpen) {
@@ -201,25 +231,121 @@ export default function AdminLayout({
           </div>
 
           <div className="flex shrink-0 items-center gap-3">
-            <div className="hidden text-right sm:block">
-              <p className="text-sm font-medium">{admin.nama}</p>
-              <p className="text-xs capitalize text-slate-500">{admin.role}</p>
+            <Link
+              href="/"
+              className="hidden sm:inline-flex items-center justify-center rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-xs font-semibold text-slate-700 hover:bg-slate-50 transition-colors"
+            >
+              Lihat situs
+            </Link>
+
+            <div className="relative" ref={dropdownRef}>
+              <button
+                type="button"
+                onClick={() => setProfileDropdownOpen((prev) => !prev)}
+                className="flex items-center gap-2.5 p-1 pr-3.5 min-h-[48px] rounded-full border border-purple-200 hover:border-brand-primary/50 hover:bg-slate-100 transition-all cursor-pointer select-none"
+                aria-expanded={profileDropdownOpen}
+                aria-haspopup="menu"
+                aria-label="Menu akun admin"
+              >
+                <span
+                  aria-hidden="true"
+                  className="flex h-10 w-10 items-center justify-center rounded-full bg-brand-lavender text-sm font-semibold text-brand-primary shrink-0"
+                >
+                  {admin.nama?.trim().charAt(0).toUpperCase() || 'A'}
+                </span>
+                <span className="hidden sm:inline text-sm font-semibold text-slate-900 max-w-[140px] truncate">
+                  {admin.nama}
+                </span>
+                <ChevronDown
+                  className={`w-4 h-4 text-slate-500 transition-transform duration-200 ${
+                    profileDropdownOpen ? 'rotate-180 text-brand-primary' : ''
+                  }`}
+                />
+              </button>
+
+              {profileDropdownOpen && (
+                <div
+                  className="absolute right-0 mt-2 w-64 rounded-2xl bg-white border border-slate-200 shadow-xl p-2 z-50 animate-in fade-in slide-in-from-top-2 duration-150 font-sans"
+                  role="menu"
+                  aria-label="Menu akun"
+                >
+                  <div className="px-3 py-2.5 border-b border-slate-100 mb-1">
+                    <p className="text-sm font-bold text-slate-900 truncate">{admin.nama}</p>
+                    {admin.email && (
+                      <p className="text-xs text-slate-500 truncate mt-0.5">{admin.email}</p>
+                    )}
+                    <div className="mt-1.5">
+                      <span className="inline-block rounded-full px-2.5 py-0.5 text-[10px] font-bold uppercase tracking-wider bg-brand-lavender text-brand-primary border border-brand-primary/20">
+                        Administrator
+                      </span>
+                    </div>
+                  </div>
+
+                  <div className="py-1 flex flex-col gap-0.5">
+                    <Link
+                      href="/admin"
+                      onClick={() => setProfileDropdownOpen(false)}
+                      className="flex items-center gap-2.5 px-3 py-2 text-xs font-medium text-slate-700 hover:bg-brand-lavender/50 hover:text-brand-primary rounded-lg transition-colors group"
+                      role="menuitem"
+                    >
+                      <Shield className="w-4 h-4 text-slate-400 group-hover:text-brand-primary shrink-0" />
+                      <span>Ruang Admin</span>
+                    </Link>
+                    <Link
+                      href="/admin/review"
+                      onClick={() => setProfileDropdownOpen(false)}
+                      className="flex items-center gap-2.5 px-3 py-2 text-xs font-medium text-slate-700 hover:bg-brand-lavender/50 hover:text-brand-primary rounded-lg transition-colors group"
+                      role="menuitem"
+                    >
+                      <ClipboardCheck className="w-4 h-4 text-slate-400 group-hover:text-brand-primary shrink-0" />
+                      <span>Peninjauan</span>
+                    </Link>
+                    <Link
+                      href="/akun/profil"
+                      onClick={() => setProfileDropdownOpen(false)}
+                      className="flex items-center gap-2.5 px-3 py-2 text-xs font-medium text-slate-700 hover:bg-brand-lavender/50 hover:text-brand-primary rounded-lg transition-colors group"
+                      role="menuitem"
+                    >
+                      <UserIcon className="w-4 h-4 text-slate-400 group-hover:text-brand-primary shrink-0" />
+                      <span>Pengaturan Profil</span>
+                    </Link>
+                    <Link
+                      href="/akun/keamanan"
+                      onClick={() => setProfileDropdownOpen(false)}
+                      className="flex items-center gap-2.5 px-3 py-2 text-xs font-medium text-slate-700 hover:bg-brand-lavender/50 hover:text-brand-primary rounded-lg transition-colors group"
+                      role="menuitem"
+                    >
+                      <KeyRound className="w-4 h-4 text-slate-400 group-hover:text-brand-primary shrink-0" />
+                      <span>Kata Sandi & Keamanan</span>
+                    </Link>
+                    <Link
+                      href="/akun/notifikasi"
+                      onClick={() => setProfileDropdownOpen(false)}
+                      className="flex items-center gap-2.5 px-3 py-2 text-xs font-medium text-slate-700 hover:bg-brand-lavender/50 hover:text-brand-primary rounded-lg transition-colors group"
+                      role="menuitem"
+                    >
+                      <Bell className="w-4 h-4 text-slate-400 group-hover:text-brand-primary shrink-0" />
+                      <span>Pemberitahuan & Notifikasi</span>
+                    </Link>
+                  </div>
+
+                  <div className="pt-1 mt-1 border-t border-slate-100">
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setProfileDropdownOpen(false);
+                        onLogout();
+                      }}
+                      className="w-full flex items-center gap-2.5 px-3 py-2 text-xs font-semibold text-red-600 hover:bg-red-50 rounded-lg transition-colors text-left cursor-pointer"
+                      role="menuitem"
+                    >
+                      <LogOut className="w-4 h-4 text-red-500 shrink-0" />
+                      <span>Keluar dari Akun</span>
+                    </button>
+                  </div>
+                </div>
+              )}
             </div>
-            <span
-              aria-hidden="true"
-              className="flex h-9 w-9 items-center justify-center rounded-full bg-brand-lavender text-sm font-semibold text-brand-primary"
-            >
-              {admin.nama?.trim().charAt(0).toUpperCase() || 'A'}
-            </span>
-            <button
-              aria-label="Keluar dari akun admin"
-              className="inline-flex items-center gap-2 rounded-lg border border-slate-200 px-3 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50 focus:outline-none focus:ring-2 focus:ring-brand-primary"
-              onClick={onLogout}
-              type="button"
-            >
-              <LogOut aria-hidden="true" size={16} />
-              <span className="hidden sm:inline">Keluar</span>
-            </button>
           </div>
         </header>
 

@@ -2,13 +2,27 @@
 
 import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
-import { useEffect, type ReactNode } from 'react';
-import { Home, MapPin, MessageCircle, Settings, LogOut, LockKeyhole } from 'lucide-react';
+import { useEffect, useRef, useState, type ReactNode } from 'react';
+import {
+  Home,
+  MapPin,
+  MessageCircle,
+  Settings,
+  LogOut,
+  LockKeyhole,
+  Bell,
+  ChevronDown,
+  LayoutDashboard,
+  Building,
+  User as UserIcon,
+  KeyRound,
+} from 'lucide-react';
 import { cn } from '@/lib/owner/cn';
 import { initials } from '@/lib/owner/format';
 import { SESSION_EXPIRED_EVENT } from '@/lib/owner/api/client';
 import { useSession } from '@/features/auth/use-session';
 import { clearSession } from '@/features/auth/session';
+import { api } from '@/modules/account/lib/api/client';
 
 import { ButtonLink } from '@/components/owner-ui/button';
 import { Card } from '@/components/owner-ui/card';
@@ -35,6 +49,9 @@ export function PemilikShell({ children }: { children: ReactNode }) {
   const pathname = usePathname() || '/';
   const router = useRouter();
   const toast = useToast();
+  const [profileDropdownOpen, setProfileDropdownOpen] = useState(false);
+  const [unreadCount, setUnreadCount] = useState<number>(0);
+  const dropdownRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     const onExpired = () => toast.error('Sesi Anda berakhir. Silakan masuk kembali.');
@@ -42,7 +59,54 @@ export function PemilikShell({ children }: { children: ReactNode }) {
     return () => window.removeEventListener(SESSION_EXPIRED_EVENT, onExpired);
   }, [toast]);
 
+  // Muat jumlah notifikasi yang belum dibaca
+  useEffect(() => {
+    if (!session) {
+      setUnreadCount(0);
+      return;
+    }
+    let active = true;
+    const controller = new AbortController();
+    api
+      .get<{ belum_dibaca: number }>('/notifikasi/jumlah', { signal: controller.signal })
+      .then((res) => {
+        if (active && typeof res?.data?.belum_dibaca === 'number') {
+          setUnreadCount(res.data.belum_dibaca);
+        }
+      })
+      .catch(() => {
+        // Abaikan
+      });
+    return () => {
+      active = false;
+      controller.abort();
+    };
+  }, [session]);
+
+  // Tutup dropdown saat klik di luar
+  useEffect(() => {
+    function handleClickOutside(event: MouseEvent) {
+      if (dropdownRef.current && !dropdownRef.current.contains(event.target as Node)) {
+        setProfileDropdownOpen(false);
+      }
+    }
+    function handleKeyDown(event: KeyboardEvent) {
+      if (event.key === 'Escape') {
+        setProfileDropdownOpen(false);
+      }
+    }
+    if (profileDropdownOpen) {
+      document.addEventListener('mousedown', handleClickOutside);
+      document.addEventListener('keydown', handleKeyDown);
+    }
+    return () => {
+      document.removeEventListener('mousedown', handleClickOutside);
+      document.removeEventListener('keydown', handleKeyDown);
+    };
+  }, [profileDropdownOpen]);
+
   const logout = async () => {
+    setProfileDropdownOpen(false);
     await clearSession();
     router.push('/');
   };
@@ -61,14 +125,131 @@ export function PemilikShell({ children }: { children: ReactNode }) {
             <ButtonLink href="/" variant="secondary" size="sm" className="hidden sm:inline-flex">
               Lihat situs
             </ButtonLink>
-            {session ? (
-              <span
-                title={session.user.nama}
-                className="flex h-10 w-10 items-center justify-center rounded-full bg-brand-soft text-sm font-semibold text-brand"
-              >
-                {initials(session.user.nama)}
-              </span>
-            ) : null}
+
+            {session && (
+              <>
+                <Link
+                  href="/akun/notifikasi"
+                  className="relative flex items-center justify-center w-11 h-11 rounded-full text-ink hover:text-brand hover:bg-canvas transition-colors shrink-0"
+                  aria-label={unreadCount > 0 ? `Notifikasi, ${unreadCount} belum dibaca` : 'Notifikasi'}
+                >
+                  <Bell className="w-6 h-6 text-ink" />
+                  {unreadCount > 0 && (
+                    <span
+                      className="absolute top-1 right-1 min-w-[18px] h-[18px] px-1 rounded-full bg-brand text-white text-[11px] leading-[18px] text-center font-semibold"
+                      aria-hidden="true"
+                    >
+                      {unreadCount}
+                    </span>
+                  )}
+                </Link>
+
+                {/* Trigger Akun Konsisten */}
+                <div className="relative" ref={dropdownRef}>
+                  <button
+                    type="button"
+                    onClick={() => setProfileDropdownOpen((prev) => !prev)}
+                    className="flex items-center gap-2.5 p-1 pr-3.5 min-h-[48px] rounded-full border border-purple-200 hover:border-brand/50 hover:bg-canvas transition-all cursor-pointer select-none"
+                    aria-expanded={profileDropdownOpen}
+                    aria-haspopup="menu"
+                    aria-label="Menu akun"
+                  >
+                    <span className="flex h-10 w-10 items-center justify-center rounded-full bg-brand-soft text-sm font-semibold text-brand shrink-0">
+                      {initials(session.user.nama)}
+                    </span>
+                    <span className="text-sm font-semibold text-ink max-w-[140px] truncate hidden sm:inline">
+                      {session.user.nama}
+                    </span>
+                    <ChevronDown
+                      className={`w-4 h-4 text-ink-muted transition-transform duration-200 ${
+                        profileDropdownOpen ? 'rotate-180 text-brand' : ''
+                      }`}
+                    />
+                  </button>
+
+                  {/* Dropdown Menu */}
+                  {profileDropdownOpen && (
+                    <div
+                      className="absolute right-0 mt-2 w-64 rounded-2xl bg-white border border-line shadow-xl p-2 z-50 animate-in fade-in slide-in-from-top-2 duration-150 font-sans"
+                      role="menu"
+                      aria-label="Menu akun"
+                    >
+                      <div className="px-3 py-2.5 border-b border-line mb-1">
+                        <p className="text-sm font-bold text-ink truncate">{session.user.nama}</p>
+                        {session.user.email && (
+                          <p className="text-xs text-ink-muted truncate mt-0.5">{session.user.email}</p>
+                        )}
+                        <div className="mt-1.5">
+                          <span className="inline-block rounded-full px-2.5 py-0.5 text-[10px] font-bold uppercase tracking-wider bg-brand-soft text-brand border border-brand/20">
+                            Pemilik Kos
+                          </span>
+                        </div>
+                      </div>
+
+                      <div className="py-1 flex flex-col gap-0.5">
+                        <Link
+                          href="/pemilik"
+                          onClick={() => setProfileDropdownOpen(false)}
+                          className="flex items-center gap-2.5 px-3 py-2 text-xs font-medium text-ink hover:bg-brand-soft hover:text-brand rounded-lg transition-colors group"
+                          role="menuitem"
+                        >
+                          <LayoutDashboard className="w-4 h-4 text-ink-muted group-hover:text-brand shrink-0" />
+                          <span>Ruang Pemilik</span>
+                        </Link>
+                        <Link
+                          href="/pemilik/kos"
+                          onClick={() => setProfileDropdownOpen(false)}
+                          className="flex items-center gap-2.5 px-3 py-2 text-xs font-medium text-ink hover:bg-brand-soft hover:text-brand rounded-lg transition-colors group"
+                          role="menuitem"
+                        >
+                          <Building className="w-4 h-4 text-ink-muted group-hover:text-brand shrink-0" />
+                          <span>Kos Saya</span>
+                        </Link>
+                        <Link
+                          href="/akun/profil"
+                          onClick={() => setProfileDropdownOpen(false)}
+                          className="flex items-center gap-2.5 px-3 py-2 text-xs font-medium text-ink hover:bg-brand-soft hover:text-brand rounded-lg transition-colors group"
+                          role="menuitem"
+                        >
+                          <UserIcon className="w-4 h-4 text-ink-muted group-hover:text-brand shrink-0" />
+                          <span>Pengaturan Profil</span>
+                        </Link>
+                        <Link
+                          href="/akun/keamanan"
+                          onClick={() => setProfileDropdownOpen(false)}
+                          className="flex items-center gap-2.5 px-3 py-2 text-xs font-medium text-ink hover:bg-brand-soft hover:text-brand rounded-lg transition-colors group"
+                          role="menuitem"
+                        >
+                          <KeyRound className="w-4 h-4 text-ink-muted group-hover:text-brand shrink-0" />
+                          <span>Kata Sandi & Keamanan</span>
+                        </Link>
+                        <Link
+                          href="/akun/notifikasi"
+                          onClick={() => setProfileDropdownOpen(false)}
+                          className="flex items-center gap-2.5 px-3 py-2 text-xs font-medium text-ink hover:bg-brand-soft hover:text-brand rounded-lg transition-colors group"
+                          role="menuitem"
+                        >
+                          <Bell className="w-4 h-4 text-ink-muted group-hover:text-brand shrink-0" />
+                          <span>Pemberitahuan & Notifikasi</span>
+                        </Link>
+                      </div>
+
+                      <div className="pt-1 mt-1 border-t border-line">
+                        <button
+                          type="button"
+                          onClick={logout}
+                          className="w-full flex items-center gap-2.5 px-3 py-2 text-xs font-semibold text-danger hover:bg-danger-soft rounded-lg transition-colors text-left cursor-pointer"
+                          role="menuitem"
+                        >
+                          <LogOut className="w-4 h-4 text-danger shrink-0" />
+                          <span>Keluar dari Akun</span>
+                        </button>
+                      </div>
+                    </div>
+                  )}
+                </div>
+              </>
+            )}
           </div>
         </div>
       </header>

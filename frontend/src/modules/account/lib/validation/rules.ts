@@ -26,7 +26,9 @@ export const maxLength =
   (v) => (v.length <= n ? null : (msg ?? `Maksimal ${n.toLocaleString("id-ID")} karakter.`));
 
 export const password: Rule<unknown> = (v) =>
-  !v || (v.length >= 15 && new TextEncoder().encode(v).length <= 72) ? null : "Minimal 15 karakter dan maksimal 72 byte.";
+  !v || (v.length >= 8 && new TextEncoder().encode(v).length <= 72)
+    ? null
+    : "Kata sandi minimal 8 karakter.";
 
 /** Nomor seluler Indonesia: 08xx, 628xx, atau +628xx. */
 export const phone =

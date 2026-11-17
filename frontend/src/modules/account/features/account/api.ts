@@ -63,7 +63,17 @@ export const accountApi = {
       ).data
     ),
 
-  uploadPhoto: (_file: File) => unavailable(),
+  uploadPhoto: async (file: File) => {
+    const formData = new FormData();
+    formData.append('file', file);
+    const res = await api.post<UserDto>('/auth/profile/photo', formData);
+    return mapUser(res.data);
+  },
+
+  deletePhoto: async () => {
+    const res = await api.delete<UserDto>('/auth/profile/photo');
+    return mapUser(res.data);
+  },
 
   changePassword: async (body: { passwordSaatIni: string; passwordBaru: string }) => {
     await api.patch('/auth/password', {
@@ -76,7 +86,9 @@ export const accountApi = {
   changeEmail: (_body: { emailBaru: string; password: string }): Promise<{ emailBaru: string }> =>
     unavailable(),
 
-  deleteAccount: (_body: { password: string }) => unavailable(),
+  deleteAccount: async (body: { password: string }) => {
+    await api.delete('/auth/me', { body: { password: body.password } });
+  },
 
   notifications: async (
     q: { status?: 'belum-dibaca'; page?: number; limit?: number },

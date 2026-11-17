@@ -3,17 +3,20 @@
 import { AccountLayout } from "../../components/layout/AccountLayout";
 import { ButtonLink } from "../../components/ui/Button";
 import { Card, PageHeading } from "../../components/ui/Display";
-import { ErrorState, Skeleton } from "../../components/ui/Feedback";
+import { Alert, ErrorState, Skeleton } from "../../components/ui/Feedback";
 import { Link } from "../../components/ui/Link";
 import { formatTime } from "../../lib/format";
+import { useLocation } from "../../lib/router";
 import { useAuth } from "../auth/AuthContext";
 import { KosCard } from "../kos/KosCard";
 import { useSummary } from "./SummaryContext";
 
 export default function SummaryPage() {
   const { user } = useAuth();
+  const { query } = useLocation();
   const s = useSummary()!;
   const first = user?.nama.split(" ")[0] ?? "";
+  const redirectNotice = query.get("redirect_notice");
 
   const isOwner = user?.role === "pemilik";
   const isAdmin = user?.role === "admin";
@@ -28,6 +31,11 @@ export default function SummaryPage() {
   return (
     <AccountLayout>
       <PageHeading title={`Halo, ${first}.`} description={pageDescription} />
+      {redirectNotice === "role_mismatch" && (
+        <Alert tone="info">
+          Halaman yang sebelumnya ingin dibuka memerlukan hak akses peran yang berbeda. Anda telah diarahkan ke ringkasan akun Anda.
+        </Alert>
+      )}
       {isOwner && <div className="badge badge-brand mb-4">Akun Pemilik Kos</div>}
       {isAdmin && <div className="badge badge-brand mb-4">Akun Administrator</div>}
 

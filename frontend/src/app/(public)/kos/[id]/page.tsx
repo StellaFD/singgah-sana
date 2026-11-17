@@ -382,7 +382,7 @@ export default function KosDetailPage() {
             {kos.koordinat && (
               <div className="pt-6 border-t border-surface-border">
                 <h3 className="font-sora font-semibold text-lg text-ink mb-3">Lokasi pada Peta</h3>
-                <div className="h-72 w-full rounded-2xl overflow-hidden border border-surface-border">
+                <div className="h-80 sm:h-96 w-full rounded-2xl overflow-hidden border border-surface-border">
                   <ResultMap
                     kosList={[
                       {
@@ -397,7 +397,8 @@ export default function KosDetailPage() {
                         foto: photos[0],
                       },
                     ]}
-                    activeKosId={kos.id}
+                    activeKosId={kos.id || kos._id}
+                    showPreviewCard={false}
                   />
                 </div>
               </div>
