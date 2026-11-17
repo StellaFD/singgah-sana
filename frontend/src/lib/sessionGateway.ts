@@ -42,7 +42,7 @@ export async function sessionGateway(request: NextRequest, path: string) {
     request.nextUrl.origin,
     process.env.VERCEL_URL ? `https://${process.env.VERCEL_URL}` : '',
     process.env.VERCEL_PROJECT_PRODUCTION_URL ? `https://${process.env.VERCEL_PROJECT_PRODUCTION_URL}` : '',
-  ].filter(Boolean).map(u => u.replace(/\/$/, ''));
+  ].filter((u): u is string => Boolean(u)).map(u => u.replace(/\/$/, ''));
 
   const reqOrigin = request.headers.get('origin')?.replace(/\/$/, '') || '';
   if (!['GET', 'HEAD'].includes(request.method) && (!reqOrigin || !allowedOrigins.includes(reqOrigin))) {
