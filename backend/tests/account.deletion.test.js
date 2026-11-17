@@ -73,7 +73,7 @@ describe('Tahap 5: Safe Account Deletion & Referential Integrity', () => {
     expect(anonymizedUser.email).toContain('@deleted.invalid');
   });
 
-  it('allows Google-only user without password to delete account via HAPUS confirmation', async () => {
+  it('requires reauthentication for Google-only account deletion', async () => {
     const googleUser = await createUser('pencari');
     googleUser.user.password = undefined;
     googleUser.user.google_id = 'sub-google-only-user-777';
@@ -84,18 +84,19 @@ describe('Tahap 5: Safe Account Deletion & Referential Integrity', () => {
       .delete('/api/auth/me')
       .set(auth(googleUser.token))
       .send({});
-    expect(noConfRes.status).toBe(422);
+    expect(noConfRes.status).toBe(403);
 
     // 2. Dengan konfirmasi HAPUS berhasil
     const confRes = await request(app)
       .delete('/api/auth/me')
       .set(auth(googleUser.token))
       .send({ konfirmasi: 'HAPUS' });
-    expect(confRes.status).toBe(200);
+    expect(confRes.status).toBe(403);
+    expect(confRes.body.code).toBe('REAUTH_REQUIRED');
 
     const userInDb = await User.findById(googleUser.user._id);
-    expect(userInDb.status).toBe('suspended');
-    expect(userInDb.nama).toBe('Pengguna Dihapus');
+    expect(userInDb.status).toBe('active');
+    expect(userInDb.deleted_at).toBeNull();
   });
 });
 

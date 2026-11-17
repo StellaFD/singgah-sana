@@ -1,5 +1,6 @@
 "use client";
 
+import Image from "next/image";
 import { useEffect, useRef, type ReactNode } from "react";
 import { externalPaths } from "../../lib/config";
 import { useLocation } from "../../lib/router";
@@ -51,7 +52,9 @@ function AuthStory() {
     <section className="auth-story" aria-label="Tentang Singgah Sana">
       <div className="story-graphic-wrap">
         <div className="story-image-card">
-          <img
+          <Image
+            width={640}
+            height={480}
             src="/assets/home-imgFotoKos-42ce5.png"
             alt="Suasana kamar kos nyaman Singgah Sana"
             className="story-main-img"

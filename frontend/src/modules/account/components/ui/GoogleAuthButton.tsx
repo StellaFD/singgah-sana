@@ -3,7 +3,7 @@
 import { useEffect, useRef, useState, useCallback } from "react";
 
 interface GoogleAuthButtonProps {
-  onSuccess: (credential: string) => void;
+  onSuccess: (credential: string) => void | Promise<void>;
   onError?: (err: Error) => void;
   disabled?: boolean;
   text?: "continue_with" | "signin_with" | "signup_with";
@@ -37,7 +37,9 @@ export function GoogleAuthButton({
   const handleCredential = useCallback(
     (res: { credential?: string }) => {
       if (res.credential) {
-        onSuccess(res.credential);
+        Promise.resolve().then(() => onSuccess(res.credential!)).catch((error: unknown) => {
+          onError?.(error instanceof Error ? error : new Error("Masuk dengan Google gagal."));
+        });
       } else {
         onError?.(new Error("Kredensial Google tidak ditemukan."));
       }
@@ -67,7 +69,7 @@ export function GoogleAuthButton({
           text,
           shape: "rectangular",
           logo_alignment: "left",
-          width: Math.min(containerRef.current.offsetWidth || 380, 420),
+          width: Math.max(180, Math.min((containerRef.current.parentElement?.clientWidth || 296) - 16, 400)),
           locale: "id",
         });
 
@@ -101,8 +103,9 @@ export function GoogleAuthButton({
 
     return () => {
       isMounted = false;
+      document.getElementById("google-gsi-client")?.removeEventListener("load", renderGoogleButton);
     };
-  }, [clientId, text, handleCredential, onError]);
+  }, [clientId, text, handleCredential, onError, isConfigured]);
 
   const buttonLabel =
     text === "signup_with"

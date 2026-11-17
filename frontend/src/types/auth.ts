@@ -13,6 +13,8 @@ export interface AuthUser {
   email_verified?: boolean;
   email_verified_at?: string | null;
   password_updated_at?: string;
+  has_password?: boolean;
+  is_google?: boolean;
   role: 'pencari' | 'pemilik' | 'admin' | string;
   status?: string;
 }

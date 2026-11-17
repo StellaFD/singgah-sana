@@ -2,7 +2,6 @@ import React from 'react';
 import Link from 'next/link';
 import { ShieldCheck, Home, MessageSquare, MapPin } from 'lucide-react';
 import SearchCapsule from '@/components/kos/SearchCapsule';
-import KosCard from '@/components/kos/KosCard';
 import HomeFeaturedList from '@/components/kos/HomeFeaturedList';
 import LandlordCTA from '@/components/kos/LandlordCTA';
 import Button from '@/components/ui/Button';

@@ -8,7 +8,7 @@ export class ApiError extends Error {
   }
 }
 export interface RequestOptions { query?:Record<string,string|number|boolean|undefined>; body?:unknown; signal?:AbortSignal; }
-export interface Result<T> {data:T; message:string; pagination?:{totalData:number; totalPages:number; currentPage:number; limit:number};}
+export interface Result<T> {code?: string; data:T; message:string; pagination?:{totalData:number; totalPages:number; currentPage:number; limit:number};}
 let sessionHandler:((error:ApiError)=>void)|null=null;
 export function setSessionErrorHandler(handler:typeof sessionHandler) {sessionHandler=handler;}
 async function request<T>(method:string,path:string,options:RequestOptions={}):Promise<Result<T>> {

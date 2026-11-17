@@ -185,7 +185,7 @@ const login = async (req, res, next) => {
 
 const getMe = async (req, res, next) => {
   try {
-    const user = await User.findById(req.user._id);
+    const user = await User.findById(req.user._id).select('+password');
     res.status(200).json({
       success: true,
       data: userDto(user),
@@ -199,7 +199,7 @@ const updateProfile = async (req, res, next) => {
   try {
     const { nama, nomor_telepon } = req.body;
 
-    const user = await User.findById(req.user._id);
+    const user = await User.findById(req.user._id).select('+password');
     if (!user) {
       return res.status(404).json({ success: false, message: 'Pengguna tidak ditemukan' });
     }
@@ -560,7 +560,7 @@ const verifyEmail = async (req, res, next) => {
  */
 const resendVerification = async (req, res, next) => {
   try {
-    const user = await User.findById(req.user._id);
+    const user = await User.findById(req.user._id).select('+password');
     if (!user) {
       return res.status(404).json({
         success: false,
@@ -663,7 +663,7 @@ const uploadProfilePhoto = async (req, res, next) => {
       return res.status(422).json({ success: false, message: 'Format berkas harus berupa JPG, PNG, atau WebP yang valid.' });
     }
 
-    const user = await User.findById(req.user._id);
+    const user = await User.findById(req.user._id).select('+password +token_version');
     if (!user) {
       return res.status(404).json({ success: false, message: 'Pengguna tidak ditemukan.' });
     }
@@ -700,7 +700,7 @@ const uploadProfilePhoto = async (req, res, next) => {
 
 const deleteProfilePhoto = async (req, res, next) => {
   try {
-    const user = await User.findById(req.user._id);
+    const user = await User.findById(req.user._id).select('+password');
     if (!user) return res.status(404).json({ success: false, message: 'Pengguna tidak ditemukan.' });
     user.foto_profil = '';
     await user.save();
@@ -718,7 +718,7 @@ const deleteAccount = async (req, res, next) => {
   try {
     const { password, konfirmasi } = req.body || {};
 
-    const user = await User.findById(req.user._id).select('+password');
+    const user = await User.findById(req.user._id).select('+password +token_version');
     if (!user) {
       return res.status(404).json({ success: false, message: 'Pengguna tidak ditemukan.' });
     }
@@ -754,55 +754,49 @@ const deleteAccount = async (req, res, next) => {
           errors: { password: ['Kata sandi saat ini tidak sesuai.'] },
         });
       }
-    } else if (user.google_id) {
-      if (konfirmasi !== 'HAPUS') {
-        return res.status(422).json({
-          success: false,
-          code: 'VALIDATION_ERROR',
-          message: 'Ketik HAPUS untuk mengonfirmasi penghapusan akun Google.',
-          errors: { konfirmasi: ['Konfirmasi kata HAPUS wajib diisi.'] },
-        });
+    } else {
+      return res.status(403).json({ success: false, code: 'REAUTH_REQUIRED',
+        message: 'Atur kata sandi melalui pemulihan email sebelum menghapus akun.' });
+    }
+
+    await User.db.transaction(async (session) => {
+      // Jika pemilik, arsipkan dan tandai terhapus seluruh kos miliknya (menggunakan enum resmi skema)
+      if (user.role === 'pemilik') {
+        const Kos = require('../models/Kos');
+        await Kos.updateMany(
+          { pemilik_id: user._id },
+          {
+            $set: {
+              status_publikasi: 'archived',
+              deleted_at: new Date(),
+            },
+          }
+        ).session(session);
       }
-    }
 
-    // Jika pemilik, arsipkan dan tandai terhapus seluruh kos miliknya (menggunakan enum resmi skema)
-    if (user.role === 'pemilik') {
-      const Kos = require('../models/Kos');
-      await Kos.updateMany(
-        { pemilik_id: user._id },
-        {
-          $set: {
-            status_publikasi: 'archived',
-            deleted_at: new Date(),
-          },
-        }
-      );
-    }
+      // Pembersihan sesi, favorit, dan notifikasi
+      const Favorit = require('../models/Favorit');
+      const Notifikasi = require('../models/Notifikasi');
+      const Session = require('../models/Session');
 
-    // Pembersihan sesi, favorit, dan notifikasi
-    const Favorit = require('../models/Favorit');
-    const Notifikasi = require('../models/Notifikasi');
-    const Session = require('../models/Session');
+      await Favorit.deleteMany({ user_id: user._id }).session(session);
+      await Notifikasi.deleteMany({ user_id: user._id }).session(session);
+      await Session.deleteMany({ user_id: user._id }).session(session);
 
-    await Promise.all([
-      Favorit.deleteMany({ user_id: user._id }),
-      Notifikasi.deleteMany({ user_id: user._id }),
-      Session.deleteMany({ user_id: user._id }),
-    ]);
+      // Anonimkan data pengguna agar tidak menyisakan kegagalan referensi pada histori audit & percakapan
+      user.status = 'suspended';
+      user.deleted_at = new Date();
+      user.nama = 'Pengguna Dihapus';
+      user.email = `deleted_${user._id}_${Date.now()}@deleted.invalid`;
+      user.nomor_telepon = undefined;
+      user.foto_profil = '';
+      user.google_id = null;
+      user.password = null;
+      user.token_version = (user.token_version || 0) + 1;
+      await user.save({ session });
 
-    // Anonimkan data pengguna agar tidak menyisakan kegagalan referensi pada histori audit & percakapan
-    user.status = 'suspended';
-    user.deleted_at = new Date();
-    user.nama = 'Pengguna Dihapus';
-    user.email = `deleted_${user._id}_${Date.now()}@deleted.invalid`;
-    user.nomor_telepon = null;
-    user.foto_profil = '';
-    user.google_id = null;
-    user.password = null;
-    user.token_version = (user.token_version || 0) + 1;
-    await user.save();
 
-    await User.updateOne({ _id: user._id }, { $unset: { nomor_telepon: 1 } });
+    });
 
     // Hapus cookie sesi dari browser
     res.clearCookie('sid', {

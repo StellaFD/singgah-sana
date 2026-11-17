@@ -58,7 +58,7 @@ describe('Tahap 2: Legacy Version & Orphan Pending Reconciliation', () => {
     // Buat listing pending TANPA Pengajuan kanonikal (simulasi data seeder/legacy lama)
     const orphanKos = await Kos.create({
       pemilik_id: owner.user._id,
-      nama: 'Kos Pending Yatim',
+      nama: 'Kos Pending Yatim', deskripsi: 'Kos untuk pengujian rekonsiliasi', koordinat: { latitude: -7.7, longitude: 110.3 }, harga_per_bulan: 1000000, jumlah_kamar_total: 5, tipe: 'campur', foto: ['https://example.com/kos.jpg'],
       alamat: 'Jl Pogung Raya',
       area_kampus: 'UGM',
       status_verifikasi: 'pending',

@@ -119,8 +119,8 @@ export function PesanView() {
           description="Pertanyaan calon penghuni untuk kos yang sudah terbit akan muncul di sini."
         />
       ) : (
-        <Card className="grid gap-6 lg:grid-cols-[300px_1fr]">
-          <div className="flex flex-col gap-3">
+        <Card className="grid min-w-0 grid-cols-1 gap-6 lg:grid-cols-[300px_minmax(0,1fr)]">
+          <div className="flex min-w-0 flex-col gap-3">
             <label htmlFor="cari-pesan" className="text-sm font-semibold">
               Cari percakapan
             </label>

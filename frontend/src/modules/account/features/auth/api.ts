@@ -14,7 +14,7 @@ export const authApi = {
         '/auth/google',
         body
       )
-      .then((r: any) => {
+      .then((r) => {
         if (r.code === 'NEED_PASSWORD_LINK') {
           return {
             type: 'need_password_link' as const,

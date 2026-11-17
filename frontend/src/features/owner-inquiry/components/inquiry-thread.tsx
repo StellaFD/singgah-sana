@@ -190,13 +190,13 @@ export function InquiryThread({ inquiry, onReplied }: InquiryThreadProps) {
         {pencari?.nomor_telepon || pencari?.email ? (
           <div className="mt-3 flex flex-wrap gap-x-5 gap-y-2 text-sm text-ink-muted">
             {pencari.nomor_telepon ? (
-              <a href={`tel:${pencari.nomor_telepon}`} className="inline-flex items-center gap-2 hover:text-brand">
+              <a href={`tel:${pencari.nomor_telepon}`} className="inline-flex min-w-0 items-center gap-2 break-all hover:text-brand">
                 <Phone className="h-4 w-4" aria-hidden />
                 {pencari.nomor_telepon}
               </a>
             ) : null}
             {pencari.email ? (
-              <a href={`mailto:${pencari.email}`} className="inline-flex items-center gap-2 hover:text-brand">
+              <a href={`mailto:${pencari.email}`} className="inline-flex min-w-0 items-center gap-2 break-all hover:text-brand">
                 <Mail className="h-4 w-4" aria-hidden />
                 {pencari.email}
               </a>
@@ -225,7 +225,7 @@ export function InquiryThread({ inquiry, onReplied }: InquiryThreadProps) {
               key={m._id}
               className={isMe ? 'ml-auto max-w-[90%] rounded-2xl bg-brand-soft px-4 py-3' : 'max-w-[90%] rounded-2xl bg-canvas px-4 py-3'}
             >
-              <p className="whitespace-pre-line text-[15px]">{m.teks}</p>
+              <p className="whitespace-pre-line break-words [overflow-wrap:anywhere] text-[15px]">{m.teks}</p>
               <p className="mt-2 text-xs text-ink-muted">
                 {isMe ? 'Anda' : pencari?.nama ?? 'Calon penghuni'}
                 {m.createdAt ? ` · ${formatDate(m.createdAt)} · ${formatRelativeShort(m.createdAt)}` : ' · Waktu tidak tercatat'}

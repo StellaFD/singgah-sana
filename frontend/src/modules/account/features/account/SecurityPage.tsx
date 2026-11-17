@@ -27,7 +27,7 @@ export default function SecurityPage() {
         <h2 className="h3">Kata sandi</h2>
         <h3 className="h4">Terakhir diperbarui {formatDate(user.passwordDiperbaruiPada)}</h3>
         <p className="muted">Gunakan kata sandi unik dan jangan membagikannya.</p>
-        <Button variant="secondary" onClick={() => setOpen("password")}>Ubah kata sandi</Button>
+        {user.hasPassword ? <Button variant="secondary" onClick={() => setOpen("password")}>Ubah kata sandi</Button> : <ButtonLink to="/lupa-sandi">Buat kata sandi melalui email</ButtonLink>}
       </Card>
       <Card className="action-card">
         <h2 className="h3">Alamat email</h2>
@@ -50,7 +50,7 @@ export default function SecurityPage() {
                 Tinjau penghapusan akun
               </Button>
               <p className="small muted" style={{ marginTop: '8px' }}>
-                Penghapusan akun mandiri untuk akun Google tanpa kata sandi saat ini dinonaktifkan sementara demi keamanan karena re-autentikasi Google belum aktif.
+                Buat kata sandi melalui pemulihan email terlebih dahulu untuk mengonfirmasi penghapusan akun.
               </p>
             </div>
           ) : (

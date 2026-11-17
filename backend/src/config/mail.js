@@ -37,16 +37,12 @@ function getAppOrigin() {
       if (parsed.search || parsed.hash) {
         return '';
       }
-      // Di mode development, jika origin menunjuk ke default port 3000 sementara server berjalan di 3120
-      if (!isProd && parsed.hostname === 'localhost' && parsed.port === '3000') {
-        return 'http://localhost:3120';
-      }
       return parsed.origin;
     } catch {
       return '';
     }
   }
-  return process.env.NODE_ENV === 'production' ? '' : 'http://localhost:3120';
+  return process.env.NODE_ENV === 'production' ? '' : 'http://localhost:3000';
 }
 
 function getMailConfig() {
@@ -75,7 +71,7 @@ function getMailConfig() {
   const isEmailValid = /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/.test(pureEmail);
 
   const hasApiKey = Boolean(apiKey && apiKey.length >= 10);
-  const hasSmtpCreds = Boolean(host && !isNaN(port) && port > 0 && user && pass);
+  const hasSmtpCreds = process.env.NODE_ENV !== 'production' && Boolean(host && !isNaN(port) && port > 0 && user && pass);
 
   const isConfigured = Boolean(
     appOrigin &&

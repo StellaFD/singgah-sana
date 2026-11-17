@@ -87,7 +87,7 @@ export const accountApi = {
     unavailable(),
 
   deleteAccount: async (body: { password?: string; konfirmasi?: string }) => {
-    await api.delete('/auth/me', { body });
+    await api.delete('/auth/me', body);
   },
 
   notifications: async (

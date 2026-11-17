@@ -74,8 +74,8 @@ function useActionToken() {
 }
 
 /** Hitung mundur untuk tombol kirim ulang. */
-function useCooldown(seconds: number) {
-  const [left, setLeft] = useState(0);
+function useCooldown(seconds: number, initial = 0) {
+  const [left, setLeft] = useState(initial);
   useEffect(() => {
     if (left <= 0) return;
     const t = setTimeout(() => setLeft((n) => n - 1), 1000);
@@ -134,13 +134,10 @@ export function ForgotPasswordPage() {
 function EnabledRecoverySentPage() {
   const { query } = useLocation();
   const emailParam = query.get("email") || "";
-  const cooldown = useCooldown(limits.resendCooldownSeconds);
+  const cooldown = useCooldown(limits.resendCooldownSeconds, limits.resendCooldownSeconds);
   const [sending, setSending] = useState(false);
   const [notice, setNotice] = useState<{ tone: "success" | "error"; text: string } | null>(null);
 
-  useEffect(() => {
-    cooldown.start();
-  }, []);
 
   const handleResend = async () => {
     if (!emailParam) {
@@ -404,7 +401,7 @@ function EnabledVerifyEmailPendingPage() {
   const { user, refresh } = useAuth();
   const [checking, setChecking] = useState(false);
   const [notice, setNotice] = useState<{ tone: "success" | "error" | "info"; text: string } | null>(null);
-  const cooldown = useCooldown(limits.resendCooldownSeconds);
+  const cooldown = useCooldown(limits.resendCooldownSeconds, limits.resendCooldownSeconds);
   const [sending, setSending] = useState(false);
 
   const check = async () => {
