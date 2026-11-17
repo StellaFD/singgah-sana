@@ -44,7 +44,18 @@ export default function SecurityPage() {
         <h2 className="h3">Hapus akun</h2>
         <p className="muted">Menghapus akun menghilangkan akses ke favorit dan percakapanmu. Periksa dampaknya sebelum melanjutkan.</p>
         <div>
-          <Button variant="secondary" onClick={() => setOpen("delete")}>Tinjau penghapusan akun</Button>
+          {!user.hasPassword ? (
+            <div>
+              <Button variant="secondary" disabled title="Re-autentikasi Google belum tersedia untuk penghapusan mandiri">
+                Tinjau penghapusan akun
+              </Button>
+              <p className="small muted" style={{ marginTop: '8px' }}>
+                Penghapusan akun mandiri untuk akun Google tanpa kata sandi saat ini dinonaktifkan sementara demi keamanan karena re-autentikasi Google belum aktif.
+              </p>
+            </div>
+          ) : (
+            <Button variant="secondary" onClick={() => setOpen("delete")}>Tinjau penghapusan akun</Button>
+          )}
         </div>
       </Card>
       {open === "password" && <ChangePasswordDialog onClose={() => setOpen(null)} />}
@@ -129,7 +140,7 @@ function DeleteAccountDialog({ onClose }: { onClose: () => void }) {
   const { clear } = useAuth();
   const form = useForm<DV>({ password: "", konfirmasi: "" }, delSchema);
   const onSubmit = form.submit(async (v) => {
-    await accountApi.deleteAccount({ password: v.password });
+    await accountApi.deleteAccount({ password: v.password, konfirmasi: v.konfirmasi });
     clear("/akun-dihapus"); // gerbang anggota mengarahkan ke halaman akun dihapus
   });
   return (

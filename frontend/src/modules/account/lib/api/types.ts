@@ -13,6 +13,8 @@ export interface User {
   status: AccountStatus;
   fotoUrl: string | null;
   passwordDiperbaruiPada: string; // ISO
+  hasPassword?: boolean;
+  isGoogle?: boolean;
 }
 
 export interface Pagination {

@@ -290,7 +290,7 @@ function toKosAdminDto(kosDoc, activePengajuan = null, assetMap = {}) {
 
   const pemilikDetail = user && typeof user === 'object' && user.email
     ? {
-        _id: String(user._id),
+        _id: String(user._id || user.id || ''),
         nama: user.nama || '',
         email: user.email || '',
         nomor_telepon: user.nomor_telepon || null,
@@ -302,7 +302,7 @@ function toKosAdminDto(kosDoc, activePengajuan = null, assetMap = {}) {
         updatedAt: new Date(user.updatedAt || Date.now()).toISOString(),
         alasan_suspend: user.alasan_suspend || null,
       }
-    : {
+    : (base.pemilik ? {
         _id: base.pemilik._id,
         nama: base.pemilik.nama,
         email: '',
@@ -314,10 +314,11 @@ function toKosAdminDto(kosDoc, activePengajuan = null, assetMap = {}) {
         createdAt: base.createdAt,
         updatedAt: base.updatedAt,
         alasan_suspend: null,
-      };
+      } : null);
 
   return {
     ...base,
+    nama: base.nama || (base.draft && base.draft.nama) || (base.data_publik && base.data_publik.nama) || 'Draf tanpa nama',
     pemilik_detail: pemilikDetail,
     alasan_suspend: kos.alasan_suspend || null,
   };

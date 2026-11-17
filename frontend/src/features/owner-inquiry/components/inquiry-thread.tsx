@@ -17,6 +17,22 @@ export function InquiryThread({ inquiry, onReplied }: InquiryThreadProps) {
   const oldestCursorRef = useRef<string | null>(null);
   const [loadingOlder, setLoadingOlder] = useState(false);
 
+  const handleReplied = (updated: OwnerInquiry) => {
+    if (updated.pesan_list && updated.pesan_list.length > 0) {
+      const last = updated.pesan_list[updated.pesan_list.length - 1];
+      setDetail((prev) => {
+        if (!prev) return prev;
+        const exists = prev.riwayat_pesan.some((m) => m._id === last._id);
+        if (exists) return prev;
+        return {
+          ...prev,
+          riwayat_pesan: [...prev.riwayat_pesan, last],
+        };
+      });
+    }
+    onReplied(updated);
+  };
+
   const loadOlderMessages = async () => {
     const cursor = oldestCursorRef.current;
     if (!cursor || loadingOlder) return;
@@ -219,7 +235,7 @@ export function InquiryThread({ inquiry, onReplied }: InquiryThreadProps) {
         })}
       </div>
 
-      <ReplyForm inquiry={inquiry} onReplied={onReplied} />
+      <ReplyForm inquiry={inquiry} onReplied={handleReplied} />
     </div>
   );
 }

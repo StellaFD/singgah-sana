@@ -3,6 +3,7 @@ import Link from 'next/link';
 import { ShieldCheck, Home, MessageSquare, MapPin } from 'lucide-react';
 import SearchCapsule from '@/components/kos/SearchCapsule';
 import KosCard from '@/components/kos/KosCard';
+import HomeFeaturedList from '@/components/kos/HomeFeaturedList';
 import LandlordCTA from '@/components/kos/LandlordCTA';
 import Button from '@/components/ui/Button';
 import { getPublicKosList } from '@/features/kos/kosClient';
@@ -74,11 +75,7 @@ export default async function HomePage() {
               </p>
             </div>
           ) : (
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
-              {featuredKos.map((kos) => (
-                <KosCard key={kos.id || kos._id} kos={kos} />
-              ))}
-            </div>
+            <HomeFeaturedList kosList={featuredKos} />
           )}
 
           {/* Tombol Jelajahi Semua Kos */}

@@ -1,7 +1,7 @@
 "use client";
 
 import Image from "next/image";
-import type { HTMLAttributes, ReactNode } from "react";
+import { useState, type HTMLAttributes, type ReactNode } from "react";
 import { initials } from "../../lib/format";
 
 export function Badge({ tone = "brand", children, className = "" }: { tone?: "brand" | "success" | "danger" | "neutral"; children: ReactNode; className?: string }) {
@@ -13,8 +13,18 @@ export function Card({ as: Tag = "section", className = "", children, ...rest }:
 }
 
 export function Avatar({ nama, fotoUrl, size = 40 }: { nama: string; fotoUrl?: string | null; size?: 40 | 64 }) {
-  return fotoUrl ? (
-    <Image unoptimized width={size} height={size} className="avatar" style={{ width: size, height: size }} src={fotoUrl} alt="" />
+  const [failed, setFailed] = useState(false);
+  return fotoUrl && !failed ? (
+    <Image
+      unoptimized
+      width={size}
+      height={size}
+      className="avatar"
+      style={{ width: size, height: size }}
+      src={fotoUrl}
+      alt=""
+      onError={() => setFailed(true)}
+    />
   ) : (
     <span className="avatar" style={{ width: size, height: size, fontSize: size === 64 ? 20 : 14 }} aria-hidden="true">
       {initials(nama)}

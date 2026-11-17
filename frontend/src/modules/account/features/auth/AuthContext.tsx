@@ -14,7 +14,7 @@ export function useAuth() {
     user: shared.user ? mapUser({...shared.user, _id:shared.user.id}) : null,
     signOutTarget,
     login: async (body: {email:string; password:string}) => { const user=await authApi.login(body); await shared.refresh(); return user; },
-    googleAuth: async (body: {credential:string; role?: 'pencari' | 'pemilik'}) => {
+    googleAuth: async (body: {credential:string; role?: 'pencari' | 'pemilik'; password?: string}) => {
       const result = await authApi.googleAuth(body);
       if (result.type === 'success') {
         await shared.refresh();

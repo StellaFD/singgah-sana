@@ -38,28 +38,11 @@ function evaluateMessagingPolicy(kosDoc, senderUser) {
     };
   }
 
-  if (kosDoc.status_publikasi === 'archived') {
+  if (!isKosPubliclyVisible(kosDoc)) {
     return {
       allowed: false,
       status: 400,
-      message: 'Listing kos ini sedang diarsipkan, percakapan bersifat hanya-baca (read-only)',
-    };
-  }
-
-  if (kosDoc.status_moderasi === 'suspended') {
-    return {
-      allowed: false,
-      status: 400,
-      message: 'Listing kos ini sedang ditangguhkan oleh pengelola (suspended), percakapan bersifat hanya-baca',
-    };
-  }
-
-  const owner = kosDoc.pemilik_id;
-  if (owner && typeof owner === 'object' && owner.status === 'suspended') {
-    return {
-      allowed: false,
-      status: 400,
-      message: 'Akun pemilik kos sedang dibatasi, percakapan bersifat hanya-baca',
+      message: 'Listing kos ini tidak tersedia untuk publik atau akun pemilik sedang dibatasi',
     };
   }
 
@@ -137,101 +120,45 @@ const sendInquiry = async (req, res, next) => {
       });
     }
 
-    // 1 Thread Stabil per (pencari, kos):
-    // Cari thread yang paling mutakhir (sort updatedAt: -1 jika data legacy memiliki >1 dokumen)
-    const existingThread = await Inquiry.findOne({
+    // Cek apakah pencari memiliki pertanyaan yang masih 'menunggu' balasan pada kos ini
+    const existingWaiting = await Inquiry.findOne({
       pencari_id: req.user._id,
       kos_id,
-    }).sort({ updatedAt: -1 });
+      status: 'menunggu',
+    });
 
-    if (existingThread) {
-      // Idempotensi berbasis client_msg_id dengan pembaruan atomik
+    if (existingWaiting) {
+      // Idempotensi berbasis client_msg_id
       if (clientMsgId) {
-        if (existingThread.client_msg_id === clientMsgId) {
+        if (existingWaiting.client_msg_id === clientMsgId) {
           return res.status(200).json({
             success: true,
             message: 'Pesan sudah terkirim (idempotent)',
-            data: existingThread,
+            data: existingWaiting,
           });
         }
-        const alreadyExists = existingThread.pesan_list?.find(
+        const alreadyExists = existingWaiting.pesan_list?.find(
           (m) => m.client_msg_id === clientMsgId
         );
         if (alreadyExists) {
           return res.status(200).json({
             success: true,
             message: 'Pesan sudah terkirim (idempotent)',
-            data: existingThread,
+            data: existingWaiting,
           });
         }
-
-        const updated = await Inquiry.findOneAndUpdate(
-          {
-            _id: existingThread._id,
-            'pesan_list.client_msg_id': { $ne: clientMsgId },
-          },
-          {
-            $push: {
-              pesan_list: {
-                pengirim_id: req.user._id,
-                pengirim_role: 'pencari',
-                teks: teksTrim,
-                client_msg_id: clientMsgId,
-              },
-            },
-            $set: { status: 'menunggu' },
-          },
-          { new: true }
-        );
-
-        if (!updated) {
-          const current = await Inquiry.findById(existingThread._id);
-          return res.status(200).json({
-            success: true,
-            message: 'Pesan sudah terkirim (idempotent)',
-            data: current || existingThread,
-          });
-        }
-
-        await kirimNotifikasi(kos.pemilik_id, {
-          tipe: 'pesan_baru',
-          judul: 'Pertanyaan baru dari calon penghuni',
-          isi: teksTrim,
-          tautan: `/pemilik/pesan?id=${updated._id}`,
-        });
-
-        return res.status(200).json({
-          success: true,
-          message: 'Pesan berhasil ditambahkan ke percakapan',
-          data: updated,
-        });
       }
 
-      // Lanjutkan thread yang sama tanpa error 409
-      existingThread.pesan_list.push({
-        pengirim_id: req.user._id,
-        pengirim_role: 'pencari',
-        teks: teksTrim,
-        client_msg_id: null,
-      });
-      existingThread.status = 'menunggu';
-      await existingThread.save();
-
-      await kirimNotifikasi(kos.pemilik_id, {
-        tipe: 'pesan_baru',
-        judul: 'Pertanyaan baru dari calon penghuni',
-        isi: teksTrim,
-        tautan: `/pemilik/pesan?id=${existingThread._id}`,
-      });
-
-      return res.status(200).json({
-        success: true,
-        message: 'Pesan berhasil ditambahkan ke percakapan',
-        data: existingThread,
+      return res.status(409).json({
+        success: false,
+        message: 'Anda masih memiliki pertanyaan yang menunggu balasan pemilik pada kos ini',
+        data: {
+          inquiry_id: existingWaiting._id,
+        },
       });
     }
 
-    // Buat thread awal baru
+    // Buat inquiry baru (status: 'menunggu')
     const inquiry = await Inquiry.create({
       pencari_id: req.user._id,
       pemilik_id: kos.pemilik_id?._id || kos.pemilik_id,
@@ -253,16 +180,27 @@ const sendInquiry = async (req, res, next) => {
       data: inquiry,
     });
   } catch (error) {
-    if (error.code === 11000) {
+    if (error && error.code === 11000) {
       const existing = await Inquiry.findOne({
         pencari_id: req.user._id,
         kos_id: req.body.kos_id,
-      }).sort({ updatedAt: -1 }).catch(() => null);
+        status: 'menunggu',
+      });
       if (existing) {
-        return res.status(200).json({
-          success: true,
-          message: 'Pesan berhasil dibuka pada percakapan yang ada',
-          data: existing,
+        const clientMsgId = typeof req.body.client_msg_id === 'string' ? req.body.client_msg_id.trim() : null;
+        if (clientMsgId && (existing.client_msg_id === clientMsgId || existing.pesan_list?.some(m => m.client_msg_id === clientMsgId))) {
+          return res.status(200).json({
+            success: true,
+            message: 'Pesan sudah terkirim (idempotent)',
+            data: existing,
+          });
+        }
+        return res.status(409).json({
+          success: false,
+          message: 'Anda masih memiliki pertanyaan yang menunggu balasan pemilik pada kos ini',
+          data: {
+            inquiry_id: existing._id,
+          },
         });
       }
     }
@@ -486,8 +424,9 @@ const getInquiryById = async (req, res, next) => {
  */
 const appendMessage = async (req, res, next) => {
   try {
-    const { pesan, client_msg_id } = req.body;
-    const teksTrim = typeof pesan === 'string' ? pesan.trim() : '';
+    const { pesan, teks, balasan, client_msg_id } = req.body;
+    const teksInput = pesan ?? teks ?? balasan ?? '';
+    const teksTrim = typeof teksInput === 'string' ? teksInput.trim() : '';
 
     if (!teksTrim) {
       return res.status(400).json({

@@ -52,6 +52,7 @@ const userSchema = new mongoose.Schema(
       default: '',
     },
     status: { type: String, enum: ['active', 'suspended'], default: 'active' },
+    deleted_at: { type: Date, default: null },
     email_verified_at: { type: Date, default: null },
     reset_password_token_hash: { type: String, default: null, select: false, index: true },
     reset_password_expires_at: { type: Date, default: null, select: false },

@@ -98,22 +98,21 @@ function getTargetKosList(result: unknown): AdminKosListResponse {
     if (
       !isRecord(item) ||
       typeof item._id !== 'string' ||
-      !isRecord(item.pemilik) ||
-      typeof item.pemilik.nama !== 'string' ||
       !isStatus(item.status_verifikasi, verificationStatuses) ||
       !isStatus(item.status_publikasi, publicationStatuses) ||
       !isStatus(item.status_moderasi, moderationStatuses) ||
       typeof item.updatedAt !== 'string' ||
-      (item.data_publik !== null && !isRecord(item.data_publik)) ||
-      (item.draft !== null && !isRecord(item.draft)) ||
-      !isRecord(item.pemilik_detail)
+      (item.pemilik !== null && item.pemilik !== undefined && (!isRecord(item.pemilik) || typeof item.pemilik.nama !== 'string')) ||
+      (item.pemilik_detail !== null && item.pemilik_detail !== undefined && !isRecord(item.pemilik_detail)) ||
+      (item.data_publik !== null && item.data_publik !== undefined && !isRecord(item.data_publik)) ||
+      (item.draft !== null && item.draft !== undefined && !isRecord(item.draft))
     ) {
       throw new Error('Format item daftar kos dari API tidak sesuai kontrak.');
     }
 
     const publicData = isRecord(item.data_publik) ? item.data_publik : null;
     const draftData = isRecord(item.draft) ? item.draft : null;
-    const rawNama = draftData?.nama ?? publicData?.nama;
+    const rawNama = (typeof item.nama === 'string' && item.nama.trim().length > 0 ? item.nama : null) ?? draftData?.nama ?? publicData?.nama;
     // Draf yang baru dibuat boleh belum punya nama; jangan gagalkan seluruh tabel
     const nama =
       typeof rawNama === 'string' && rawNama.trim().length > 0
@@ -129,22 +128,33 @@ function getTargetKosList(result: unknown): AdminKosListResponse {
         ? pendingSubmission._id
         : null;
 
-    const areaKampus = draftData?.area_kampus ?? publicData?.area_kampus;
-    const alamat = draftData?.alamat ?? publicData?.alamat;
+    const areaKampus = draftData?.area_kampus ?? publicData?.area_kampus ?? (typeof item.area_kampus === 'string' ? item.area_kampus : null);
+    const alamat = draftData?.alamat ?? publicData?.alamat ?? (typeof item.alamat === 'string' ? item.alamat : null);
     const lokasi =
       (typeof areaKampus === 'string' && areaKampus) ||
       (typeof alamat === 'string' && alamat) ||
       'Lokasi tidak tersedia';
-    const email = item.pemilik_detail.email;
+    
+    const owner = isRecord(item.pemilik) ? item.pemilik : null;
+    const ownerDetail = isRecord(item.pemilik_detail) ? item.pemilik_detail : null;
+    const email =
+      typeof ownerDetail?.email === 'string'
+        ? ownerDetail.email
+        : typeof owner?.email === 'string'
+          ? owner.email
+          : undefined;
 
     return {
       _id: item._id,
       nama,
       lokasi,
-      pemilik: {
-        nama: item.pemilik.nama,
-        ...(typeof email === 'string' ? { email } : {}),
-      },
+      pemilik:
+        owner && typeof owner.nama === 'string'
+          ? {
+              nama: owner.nama,
+              ...(typeof email === 'string' ? { email } : {}),
+            }
+          : null,
       status_verifikasi: item.status_verifikasi,
       status_publikasi: item.status_publikasi,
       status_moderasi: item.status_moderasi,

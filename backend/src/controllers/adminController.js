@@ -15,6 +15,16 @@ const ADMIN_KOS_STATUS_FILTERS = {
 
 const getAllKosAdmin = async (req, res, next) => {
   try {
+    for (const param of ['q', 'page', 'limit', 'status_verifikasi', 'status_publikasi', 'status_moderasi', 'status']) {
+      if (req.query[param] !== undefined && typeof req.query[param] !== 'string') {
+        return res.status(422).json({
+          success: false,
+          code: 'VALIDATION_ERROR',
+          message: `Parameter query ${param} harus berupa nilai skalar tunggal`,
+        });
+      }
+    }
+
     const { q, page, limit } = req.query;
 
     const filter = { deleted_at: null };
@@ -55,6 +65,7 @@ const getAllKosAdmin = async (req, res, next) => {
     const skip = (currentPage - 1) * limitNum;
     const dataKos = await Kos.find(filter)
       .populate('pemilik_id', 'nama email nomor_telepon role status email_verified version createdAt updatedAt alasan_suspend')
+      .populate('diverifikasi_oleh', 'nama email')
       .sort({ createdAt: -1 })
       .skip(skip)
       .limit(limitNum);
@@ -67,16 +78,60 @@ const getAllKosAdmin = async (req, res, next) => {
       activeSubmissions.map((pengajuan) => [String(pengajuan.kos_id), pengajuan])
     );
 
+    const serializedData = dataKos.map((kos) => {
+      try {
+        const dto = toKosAdminDto(kos, submissionByKos.get(String(kos._id)) || null);
+        if (dto) return dto;
+      } catch (err) {
+        console.error(`[Admin Kos Serializer Error] Failed to serialize kos ${kos._id}:`, err);
+      }
+      return {
+        _id: String(kos._id),
+        nama: kos.nama || 'Kos tanpa nama',
+        pemilik: kos.pemilik_id
+          ? {
+              _id: String(kos.pemilik_id._id || kos.pemilik_id),
+              nama: kos.pemilik_id.nama || 'Pengelola kos',
+            }
+          : null,
+        pemilik_detail: kos.pemilik_id
+          ? {
+              _id: String(kos.pemilik_id._id || kos.pemilik_id),
+              nama: kos.pemilik_id.nama || 'Pengelola kos',
+              email: kos.pemilik_id.email || '',
+              nomor_telepon: kos.pemilik_id.nomor_telepon || null,
+              role: kos.pemilik_id.role || 'pemilik',
+              status: kos.pemilik_id.status || 'active',
+            }
+          : null,
+        status_verifikasi: kos.status_verifikasi || 'draft',
+        status_publikasi: kos.status_publikasi || 'active',
+        status_moderasi: kos.status_moderasi || 'normal',
+        version: Number(kos.version || 1),
+        ketersediaan: {
+          jumlah_kamar_tersedia: Number(kos.jumlah_kamar_tersedia || 0),
+          version_ketersediaan: Number(kos.version_ketersediaan || 1),
+          ketersediaan_diperbarui_pada: null,
+        },
+        data_publik: null,
+        draft: null,
+        perubahan_tertunda: null,
+        deleted_at: kos.deleted_at ? new Date(kos.deleted_at).toISOString() : null,
+        createdAt: new Date(kos.createdAt || Date.now()).toISOString(),
+        updatedAt: new Date(kos.updatedAt || Date.now()).toISOString(),
+      };
+    });
+
     res.status(200).json({
       success: true,
-      count: dataKos.length,
+      count: serializedData.length,
       pagination: {
         totalData,
         totalPages,
         currentPage,
         limit: limitNum,
       },
-      data: dataKos.map((kos) => toKosAdminDto(kos, submissionByKos.get(String(kos._id)) || null)),
+      data: serializedData,
     });
   } catch (error) {
     next(error);

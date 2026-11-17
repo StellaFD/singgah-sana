@@ -6,6 +6,7 @@ import { Checkbox, Field } from "../../components/ui/Field";
 import { Alert } from "../../components/ui/Feedback";
 import { Link } from "../../components/ui/Link";
 import { GoogleAuthButton } from "../../components/ui/GoogleAuthButton";
+import { LinkPasswordModal } from "../../components/ui/LinkPasswordModal";
 import { ApiError } from "../../lib/api/client";
 import { externalPaths } from "../../lib/config";
 import { useForm } from "../../lib/hooks/useForm";
@@ -48,17 +49,31 @@ export default function RegisterPage() {
 
   const [googleLoading, setGoogleLoading] = useState(false);
   const [googleError, setGoogleError] = useState<string | null>(null);
+  const [pendingPasswordLink, setPendingPasswordLink] = useState<{
+    credential: string;
+    email: string;
+    nama: string;
+  } | null>(null);
 
   const form = useForm<V>({ nama: "", email: "", telepon: "", password: "", konfirmasi: "" }, schema);
   const [agree, setAgree] = useState(false);
   const [agreeError, setAgreeError] = useState<string>();
 
-  const handleGoogleRegister = async (credential: string) => {
+  const handleGoogleRegister = async (credential: string, password?: string) => {
     try {
       setGoogleLoading(true);
       setGoogleError(null);
-      const result = await googleAuth({ credential, role });
+      const result = await googleAuth({ credential, role, password });
+      if (result.type === "need_password_link") {
+        setPendingPasswordLink({
+          credential,
+          email: result.data.email,
+          nama: result.data.nama,
+        });
+        return;
+      }
       if (result.type === "success") {
+        setPendingPasswordLink(null);
         let target = resolvePostAuthRedirect(result.user.role, nextParam);
         if (nextParam && target !== nextParam && safeInternalPath(nextParam)) {
           const separator = target.includes("?") ? "&" : "?";
@@ -76,6 +91,7 @@ export default function RegisterPage() {
           ? e.message
           : "Gagal mendaftar dengan Google. Silakan coba lagi."
       );
+      throw e;
     } finally {
       setGoogleLoading(false);
     }
@@ -109,7 +125,8 @@ export default function RegisterPage() {
   });
 
   return (
-    <AuthCard title={title} description={description} onSubmit={onSubmit} formRef={form.formRef}>
+    <>
+      <AuthCard title={title} description={description} onSubmit={onSubmit} formRef={form.formRef}>
       {isAdminAttempt && (
         <Alert tone="info">
           Pendaftaran akun administrator tidak tersedia secara publik. Silakan mendaftar sebagai pencari atau pemilik kos.
@@ -221,5 +238,18 @@ export default function RegisterPage() {
         </Link>
       </p>
     </AuthCard>
+
+    {pendingPasswordLink && (
+      <LinkPasswordModal
+        userName={pendingPasswordLink.nama}
+        userEmail={pendingPasswordLink.email}
+        loading={googleLoading}
+        onSubmitPassword={async (pw) => {
+          await handleGoogleRegister(pendingPasswordLink.credential, pw);
+        }}
+        onClose={() => setPendingPasswordLink(null)}
+      />
+    )}
+  </>
   );
 }

@@ -85,16 +85,17 @@ export function PesanView() {
     const term = query.trim().toLowerCase();
     return (data ?? []).filter((item) => {
       const matchFilter = filter === 'semua' || item.status === filter;
+      const textPreview = item.cuplikan || item.pesan;
       const matchQuery =
         !term ||
         (item.pencari_id?.nama ?? '').toLowerCase().includes(term) ||
         item.kos_id.nama.toLowerCase().includes(term) ||
-        item.pesan.toLowerCase().includes(term);
+        textPreview.toLowerCase().includes(term);
       return matchFilter && matchQuery;
     });
   }, [data, filter, query]);
 
-  const selectedId = searchParams?.get('id') ?? list[0]?._id ?? null;
+  const selectedId = searchParams?.get('id') ?? searchParams?.get('c') ?? list[0]?._id ?? null;
   const selected = (data ?? []).find((item) => item._id === selectedId) ?? null;
 
   const select = (id: string) => router.replace(`${pathname}?id=${id}`, { scroll: false });
@@ -171,9 +172,9 @@ export function PesanView() {
                           <span className="h-2 w-2 shrink-0 rounded-full bg-brand" aria-label="Belum dibalas" />
                         ) : null}
                       </span>
-                      <span className="mt-1 block truncate text-sm text-ink-muted">{item.pesan}</span>
+                      <span className="mt-1 block truncate text-sm text-ink-muted">{item.cuplikan || item.pesan}</span>
                       <span className="mt-1 block text-xs text-ink-subtle">
-                        {item.kos_id.nama} · {formatRelativeShort(item.createdAt)}
+                        {item.kos_id.nama} · {formatRelativeShort(item.waktu_terbaru || item.updatedAt || item.createdAt)}
                       </span>
                     </button>
                   </li>

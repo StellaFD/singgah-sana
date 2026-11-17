@@ -1,4 +1,3 @@
-const { describe, test } = require('node:test');
 const assert = require('node:assert/strict');
 const crypto = require('crypto');
 const { escapeHtml, renderPasswordResetEmail, renderEmailVerificationEmail } = require('../src/services/emailService');

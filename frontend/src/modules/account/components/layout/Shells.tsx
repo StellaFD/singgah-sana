@@ -58,8 +58,8 @@ function AuthStory() {
           />
           <div className="story-image-overlay" />
           <div className="story-badge story-badge-top">
-            <span className="story-badge-star">★</span>
-            <span>4.9 · Terverifikasi</span>
+            <span className="story-badge-dot" style={{ backgroundColor: '#22c55e' }} />
+            <span>Terverifikasi Kurasi</span>
           </div>
           <div className="story-badge story-badge-bottom">
             <span className="story-badge-dot" />

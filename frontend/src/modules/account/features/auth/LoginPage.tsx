@@ -7,6 +7,7 @@ import { Alert } from "../../components/ui/Feedback";
 import { Link } from "../../components/ui/Link";
 import { GoogleAuthButton } from "../../components/ui/GoogleAuthButton";
 import { RoleSelectionModal } from "../../components/ui/RoleSelectionModal";
+import { LinkPasswordModal } from "../../components/ui/LinkPasswordModal";
 import { ApiError } from "../../lib/api/client";
 import { useForm } from "../../lib/hooks/useForm";
 import { navigate, useLocation } from "../../lib/router";
@@ -46,19 +47,36 @@ export default function LoginPage() {
     email: string;
     nama: string;
   } | null>(null);
+  const [pendingPasswordLink, setPendingPasswordLink] = useState<{
+    credential: string;
+    email: string;
+    nama: string;
+  } | null>(null);
 
   const handleGoogleAuth = async (
     credential: string,
-    chosenRole?: "pencari" | "pemilik"
+    chosenRole?: "pencari" | "pemilik",
+    password?: string
   ) => {
     try {
       setGoogleLoading(true);
       setGoogleError(null);
       const roleToSubmit =
         chosenRole || (roleContext === "pemilik" ? "pemilik" : undefined);
-      const result = await googleAuth({ credential, role: roleToSubmit });
+      const result = await googleAuth({ credential, role: roleToSubmit, password });
+
+      if (result.type === "need_password_link") {
+        setPendingGoogleUser(null);
+        setPendingPasswordLink({
+          credential,
+          email: result.data.email,
+          nama: result.data.nama,
+        });
+        return;
+      }
 
       if (result.type === "need_role") {
+        setPendingPasswordLink(null);
         setPendingGoogleUser({
           credential,
           email: result.data.email,
@@ -68,6 +86,7 @@ export default function LoginPage() {
       }
 
       setPendingGoogleUser(null);
+      setPendingPasswordLink(null);
       let target = resolvePostAuthRedirect(result.user.role, nextParam);
       if (nextParam && target !== nextParam && safeInternalPath(nextParam)) {
         const separator = target.includes("?") ? "&" : "?";
@@ -84,6 +103,7 @@ export default function LoginPage() {
           ? e.message
           : "Gagal masuk dengan Google. Silakan coba lagi."
       );
+      throw e;
     } finally {
       setGoogleLoading(false);
     }
@@ -181,6 +201,18 @@ export default function LoginPage() {
             await handleGoogleAuth(pendingGoogleUser.credential, r);
           }}
           onClose={() => setPendingGoogleUser(null)}
+        />
+      )}
+
+      {pendingPasswordLink && (
+        <LinkPasswordModal
+          userName={pendingPasswordLink.nama}
+          userEmail={pendingPasswordLink.email}
+          loading={googleLoading}
+          onSubmitPassword={async (pw) => {
+            await handleGoogleAuth(pendingPasswordLink.credential, undefined, pw);
+          }}
+          onClose={() => setPendingPasswordLink(null)}
         />
       )}
     </>

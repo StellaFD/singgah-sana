@@ -16,6 +16,8 @@ export type OwnerInquiry = {
   pemilik_id: string;
   pesan: string;
   balasan: string;
+  cuplikan?: string;
+  waktu_terbaru?: string;
   pesan_list?: ChatMessage[];
   status: StatusInquiry;
   createdAt: string;

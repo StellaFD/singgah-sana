@@ -811,7 +811,8 @@ async function updateAvailability(ownerId, kosId, stok, expectedVersion) {
     throw err;
   }
 
-  if (typeof expectedVersion !== 'number' || expectedVersion !== kos.version_ketersediaan) {
+  const currentVersionKetersediaan = Number(kos.version_ketersediaan || 1);
+  if (typeof expectedVersion !== 'number' || expectedVersion !== currentVersionKetersediaan) {
     const err = new Error('Versi ketersediaan tidak sesuai. Muat ulang lalu coba lagi.');
     err.statusCode = 409;
     throw err;
@@ -837,13 +838,21 @@ async function updateAvailability(ownerId, kosId, stok, expectedVersion) {
   }
 
   const updatedKos = await Kos.findOneAndUpdate(
-    { _id: kosId, pemilik_id: ownerId, deleted_at: null, version_ketersediaan: expectedVersion },
+    {
+      _id: kosId,
+      pemilik_id: ownerId,
+      deleted_at: null,
+      $or: [
+        { version_ketersediaan: expectedVersion },
+        ...(expectedVersion === 1 ? [{ version_ketersediaan: { $exists: false } }, { version_ketersediaan: null }] : []),
+      ],
+    },
     {
       $set: {
         jumlah_kamar_tersedia: stokNum,
         ketersediaan_diperbarui_pada: new Date(),
+        version_ketersediaan: (expectedVersion || 1) + 1,
       },
-      $inc: { version_ketersediaan: 1 },
     },
     { new: true }
   ).populate('pemilik_id', 'nama email role');
@@ -880,9 +889,19 @@ async function updatePublication(ownerId, kosId, statusPublikasi, expectedVersio
   }
 
   const updatedKos = await Kos.findOneAndUpdate(
-    { _id: kosId, pemilik_id: ownerId, deleted_at: null, version: expectedVersion },
     {
-      $set: { status_publikasi: statusPublikasi },
+      _id: kosId,
+      pemilik_id: ownerId,
+      deleted_at: null,
+      $or: [
+        { version: expectedVersion },
+        ...(expectedVersion === 1 ? [{ version: { $exists: false } }, { version: null }] : []),
+      ],
+    },
+    {
+      $set: {
+        status_publikasi: statusPublikasi,
+      },
     },
     { new: true }
   ).populate('pemilik_id', 'nama email role');
@@ -945,16 +964,28 @@ async function softDeleteKos(ownerId, kosId, expectedVersion) {
     throw err;
   }
 
-  if (typeof expectedVersion !== 'number' || expectedVersion !== kos.version) {
+  const currentVersion = Number(kos.version || 1);
+  if (typeof expectedVersion !== 'number' || expectedVersion !== currentVersion) {
     const err = new Error('Versi listing tidak sesuai. Muat ulang lalu coba lagi.');
     err.statusCode = 409;
     throw err;
   }
 
   const updatedKos = await Kos.findOneAndUpdate(
-    { _id: kosId, pemilik_id: ownerId, deleted_at: null, version: expectedVersion },
     {
-      $set: { deleted_at: new Date() },
+      _id: kosId,
+      pemilik_id: ownerId,
+      deleted_at: null,
+      $or: [
+        { version: expectedVersion },
+        ...(expectedVersion === 1 ? [{ version: { $exists: false } }, { version: null }] : []),
+      ],
+    },
+    {
+      $set: {
+        deleted_at: new Date(),
+        version: (expectedVersion || 1) + 1,
+      },
     },
     { new: true }
   );
@@ -1539,9 +1570,15 @@ async function getAdminSubmissionDetail(submissionId) {
     throw err;
   }
 
-  const pengajuan = await Pengajuan.findById(submissionId)
+  let pengajuan = await Pengajuan.findById(submissionId)
     .populate('pemilik_id', 'nama email role')
     .populate('reviewed_by', 'nama email role');
+
+  if (!pengajuan) {
+    pengajuan = await Pengajuan.findOne({ kos_id: submissionId, is_active: true })
+      .populate('pemilik_id', 'nama email role')
+      .populate('reviewed_by', 'nama email role');
+  }
 
   if (!pengajuan) {
     const err = new Error('Pengajuan tidak ditemukan');

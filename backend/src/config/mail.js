@@ -50,42 +50,54 @@ function getAppOrigin() {
 }
 
 function getMailConfig() {
+  const apiKey = (process.env.BREVO_API_KEY || '').trim();
   const host = (process.env.BREVO_SMTP_HOST || 'smtp-relay.brevo.com').trim();
   const port = parseInt(process.env.BREVO_SMTP_PORT || '587', 10);
   const user = (process.env.BREVO_SMTP_USER || '').trim();
   const pass = (process.env.BREVO_SMTP_KEY || '').trim();
-  const from = (process.env.MAIL_FROM || '').trim();
+  let from = (process.env.MAIL_FROM || '').trim();
+
+  // Bersihkan tanda kutip pembungkus jika ada
+  if ((from.startsWith('"') && from.endsWith('"')) || (from.startsWith("'") && from.endsWith("'"))) {
+    from = from.slice(1, -1).trim();
+  }
 
   // APP_ORIGIN wajib terverifikasi valid agar sistem tidak pernah mengirim tautan relatif
   const appOrigin = getAppOrigin();
 
-  // Validasi MAIL_FROM ketat: tolak karakter CRLF (\r atau \n) untuk mencegah header injection
-  const hasNoCrlf = !/[\r\n]/.test(from) && !/[\r\n]/.test(user);
+  // Validasi ketat: tolak karakter CRLF (\r atau \n) untuk mencegah header injection
+  const hasNoCrlf = !/[\r\n]/.test(from) && !/[\r\n]/.test(user) && !/[\r\n]/.test(apiKey);
 
   // Email pengirim harus bervalidasi format email standar
-  const emailMatch = from.match(/^.*<([^>]+)>.*$/) || [null, from];
-  const pureEmail = (emailMatch[1] || '').trim();
+  const emailMatch = from.match(/^([^<]*)<([^>]+)>.*$/) || [null, '', from];
+  const senderName = (emailMatch[1] || '').trim() || 'Singgah Sana';
+  const pureEmail = (emailMatch[2] || from).trim();
   const isEmailValid = /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/.test(pureEmail);
+
+  const hasApiKey = Boolean(apiKey && apiKey.length >= 10);
+  const hasSmtpCreds = Boolean(host && !isNaN(port) && port > 0 && user && pass);
 
   const isConfigured = Boolean(
     appOrigin &&
     hasNoCrlf &&
-    host &&
-    !isNaN(port) &&
-    port > 0 &&
-    user &&
-    pass &&
     from &&
-    isEmailValid
+    isEmailValid &&
+    (hasApiKey || hasSmtpCreds)
   );
+
+  const transportMode = hasApiKey ? 'https_api' : (hasSmtpCreds ? 'smtp' : 'none');
 
   return {
     isConfigured,
+    transportMode,
+    apiKey,
     host,
     port,
     user,
     pass,
     from,
+    senderName,
+    senderEmail: pureEmail,
     appOrigin,
   };
 }

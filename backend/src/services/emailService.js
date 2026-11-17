@@ -120,70 +120,130 @@ function renderEmailVerificationEmail({ name, verifyUrl }) {
   return { subject, text, html };
 }
 
-async function sendPasswordResetEmail(toEmail, toName, rawToken) {
-  const transporter = getMailTransporter();
+async function sendTransactionalMail({ toEmail, toName, subject, text, html }) {
   const config = getMailConfig();
 
-  if (!transporter || !config.isConfigured) {
+  if (!config.isConfigured) {
     const error = new Error('Layanan email belum dikonfigurasi.');
     error.code = 'SMTP_NOT_CONFIGURED';
     throw error;
   }
 
-  const appOrigin = getAppOrigin();
-  // Gunakan fragment URI (#token=...) agar token tidak pernah terkirim ke access log server web / Next.js
-  const resetUrl = `${appOrigin}/reset-sandi#token=${encodeURIComponent(rawToken)}`;
-  const { subject, text, html } = renderPasswordResetEmail({ name: toName, resetUrl });
+  if (config.transportMode === 'https_api') {
+    // Kirim via Brevo HTTPS REST API (Port 443 - aman dari firewall cloud)
+    const payload = {
+      sender: {
+        name: config.senderName,
+        email: config.senderEmail,
+      },
+      to: [
+        {
+          email: toEmail,
+          name: toName || 'Pengguna Singgah Sana',
+        },
+      ],
+      subject,
+      htmlContent: html,
+      textContent: text,
+    };
+
+    let response;
+    try {
+      response = await fetch('https://api.brevo.com/v3/smtp/email', {
+        method: 'POST',
+        headers: {
+          'Accept': 'application/json',
+          'Content-Type': 'application/json',
+          'api-key': config.apiKey,
+        },
+        body: JSON.stringify(payload),
+        signal: AbortSignal.timeout(10000), // Timeout 10 detik agar tidak melebihi gateway 15s
+      });
+    } catch (err) {
+      const errCode = (err && typeof err.name === 'string' && err.name === 'TimeoutError') ? 'ETIMEDOUT' : 'NETWORK_ERROR';
+      console.error(`[Mail Error] Pengiriman via Brevo HTTPS API gagal: ${errCode}`);
+      const deliveryError = new Error('Pengiriman email gagal.');
+      deliveryError.code = errCode;
+      throw deliveryError;
+    }
+
+    if (!response.ok) {
+      let errBody = {};
+      try {
+        errBody = await response.json();
+      } catch {}
+      const safeErrCode = (errBody && typeof errBody.code === 'string') ? errBody.code : `HTTP_${response.status}`;
+      console.error(`[Mail Error] Brevo HTTPS API menolak pengiriman: ${safeErrCode} (status: ${response.status})`);
+      const deliveryError = new Error('Pengiriman email ditolak oleh penyedia layanan.');
+      deliveryError.code = safeErrCode;
+      deliveryError.statusCode = response.status;
+      throw deliveryError;
+    }
+
+    let result = {};
+    try {
+      result = await response.json();
+    } catch {}
+    const safeMsgId = (result && typeof result.messageId === 'string') ? result.messageId : 'accepted';
+    console.log(`[Mail] Email berhasil dikirim via Brevo HTTPS API (messageId: ${safeMsgId})`);
+    return { success: true, messageId: safeMsgId };
+  }
+
+  // Fallback: Kirim via Nodemailer SMTP (Port 587 / 2525)
+  const transporter = getMailTransporter();
+  if (!transporter) {
+    const error = new Error('Transporter SMTP belum tersedia.');
+    error.code = 'SMTP_NOT_CONFIGURED';
+    throw error;
+  }
 
   try {
-    await transporter.sendMail({
+    const info = await transporter.sendMail({
       from: config.from,
       to: toEmail,
       subject,
       text,
       html,
     });
-    console.log('[Mail] Tautan pemulihan kata sandi berhasil dikirim ke antrean pengiriman.');
+    console.log(`[Mail] Email berhasil dikirim via Brevo SMTP (messageId: ${info?.messageId || 'accepted'})`);
+    return { success: true, messageId: info?.messageId };
   } catch (err) {
     const sanitizedCode = (err && typeof err.code === 'string') ? err.code : 'MAIL_DELIVERY_FAILED';
-    console.error(`[Mail Error] Pengiriman email pemulihan gagal: ${sanitizedCode}`);
-    const deliveryError = new Error('Pengiriman email pemulihan gagal.');
+    console.error(`[Mail Error] Pengiriman email via SMTP gagal: ${sanitizedCode}`);
+    const deliveryError = new Error('Pengiriman email gagal.');
     deliveryError.code = sanitizedCode;
     throw deliveryError;
   }
 }
 
+async function sendPasswordResetEmail(toEmail, toName, rawToken) {
+  const appOrigin = getAppOrigin();
+  // Gunakan fragment URI (#token=...) agar token tidak pernah terkirim ke access log server web / Next.js
+  const resetUrl = `${appOrigin}/reset-sandi#token=${encodeURIComponent(rawToken)}`;
+  const { subject, text, html } = renderPasswordResetEmail({ name: toName, resetUrl });
+
+  return sendTransactionalMail({
+    toEmail,
+    toName,
+    subject,
+    text,
+    html,
+  });
+}
+
 async function sendVerificationEmail(toEmail, toName, rawToken) {
-  const transporter = getMailTransporter();
-  const config = getMailConfig();
-
-  if (!transporter || !config.isConfigured) {
-    const error = new Error('Layanan email belum dikonfigurasi.');
-    error.code = 'SMTP_NOT_CONFIGURED';
-    throw error;
-  }
-
   const appOrigin = getAppOrigin();
   // Gunakan fragment URI (#token=...) agar token tidak pernah terkirim ke access log server web / Next.js
   const verifyUrl = `${appOrigin}/verifikasi-email/konfirmasi#token=${encodeURIComponent(rawToken)}`;
   const { subject, text, html } = renderEmailVerificationEmail({ name: toName, verifyUrl });
 
-  try {
-    await transporter.sendMail({
-      from: config.from,
-      to: toEmail,
-      subject,
-      text,
-      html,
-    });
-    console.log('[Mail] Tautan verifikasi email berhasil dikirim ke antrean pengiriman.');
-  } catch (err) {
-    const sanitizedCode = (err && typeof err.code === 'string') ? err.code : 'MAIL_DELIVERY_FAILED';
-    console.error(`[Mail Error] Pengiriman email verifikasi gagal: ${sanitizedCode}`);
-    const deliveryError = new Error('Pengiriman email verifikasi gagal.');
-    deliveryError.code = sanitizedCode;
-    throw deliveryError;
-  }
+  return sendTransactionalMail({
+    toEmail,
+    toName,
+    subject,
+    text,
+    html,
+  });
 }
 
 module.exports = {
@@ -192,4 +252,5 @@ module.exports = {
   renderEmailVerificationEmail,
   sendPasswordResetEmail,
   sendVerificationEmail,
+  sendTransactionalMail,
 };

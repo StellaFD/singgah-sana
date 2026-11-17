@@ -42,6 +42,8 @@ const userDto = (user) => ({
   email_verified_at: user.email_verified_at || null,
   createdAt: user.createdAt,
   password_updated_at: user.password_updated_at,
+  has_password: Boolean(user.password || user.password_updated_at),
+  is_google: Boolean(user.google_id),
 });
 
 const generateToken = (id, role, version = 0) => {
@@ -714,33 +716,14 @@ const deleteProfilePhoto = async (req, res, next) => {
 
 const deleteAccount = async (req, res, next) => {
   try {
-    const { password } = req.body || {};
-
-    if (!password) {
-      return res.status(422).json({
-        success: false,
-        code: 'VALIDATION_ERROR',
-        message: 'Masukkan kata sandi saat ini untuk konfirmasi penghapusan akun.',
-        errors: { password: ['Kata sandi wajib diisi.'] },
-      });
-    }
+    const { password, konfirmasi } = req.body || {};
 
     const user = await User.findById(req.user._id).select('+password');
     if (!user) {
       return res.status(404).json({ success: false, message: 'Pengguna tidak ditemukan.' });
     }
 
-    const isMatch = await user.matchPassword(password);
-    if (!isMatch) {
-      return res.status(422).json({
-        success: false,
-        code: 'VALIDATION_ERROR',
-        message: 'Kata sandi saat ini tidak sesuai.',
-        errors: { password: ['Kata sandi saat ini tidak sesuai.'] },
-      });
-    }
-
-    // Role Safeguards
+    // Role Safeguards: Administrator tunggal tidak boleh dihapus
     if (user.role === 'admin') {
       const otherAdmins = await User.countDocuments({ role: 'admin', _id: { $ne: user._id } });
       if (otherAdmins === 0) {
@@ -752,16 +735,51 @@ const deleteAccount = async (req, res, next) => {
       }
     }
 
-    // Jika pemilik, nonaktifkan seluruh kos miliknya
+    // Re-autentikasi sesuai tipe akun (akun password vs akun Google tanpa password)
+    if (user.password) {
+      if (!password) {
+        return res.status(422).json({
+          success: false,
+          code: 'VALIDATION_ERROR',
+          message: 'Masukkan kata sandi saat ini untuk konfirmasi penghapusan akun.',
+          errors: { password: ['Kata sandi wajib diisi.'] },
+        });
+      }
+      const isMatch = await user.matchPassword(password);
+      if (!isMatch) {
+        return res.status(422).json({
+          success: false,
+          code: 'VALIDATION_ERROR',
+          message: 'Kata sandi saat ini tidak sesuai.',
+          errors: { password: ['Kata sandi saat ini tidak sesuai.'] },
+        });
+      }
+    } else if (user.google_id) {
+      if (konfirmasi !== 'HAPUS') {
+        return res.status(422).json({
+          success: false,
+          code: 'VALIDATION_ERROR',
+          message: 'Ketik HAPUS untuk mengonfirmasi penghapusan akun Google.',
+          errors: { konfirmasi: ['Konfirmasi kata HAPUS wajib diisi.'] },
+        });
+      }
+    }
+
+    // Jika pemilik, arsipkan dan tandai terhapus seluruh kos miliknya (menggunakan enum resmi skema)
     if (user.role === 'pemilik') {
       const Kos = require('../models/Kos');
       await Kos.updateMany(
         { pemilik_id: user._id },
-        { status_publikasi: 'inactive', status_verifikasi: 'archived' }
+        {
+          $set: {
+            status_publikasi: 'archived',
+            deleted_at: new Date(),
+          },
+        }
       );
     }
 
-    // Cascading Cleanup
+    // Pembersihan sesi, favorit, dan notifikasi
     const Favorit = require('../models/Favorit');
     const Notifikasi = require('../models/Notifikasi');
     const Session = require('../models/Session');
@@ -772,11 +790,28 @@ const deleteAccount = async (req, res, next) => {
       Session.deleteMany({ user_id: user._id }),
     ]);
 
-    // Hapus dokumen pengguna secara fisik dari MongoDB Atlas
-    await User.findByIdAndDelete(user._id);
+    // Anonimkan data pengguna agar tidak menyisakan kegagalan referensi pada histori audit & percakapan
+    user.status = 'suspended';
+    user.deleted_at = new Date();
+    user.nama = 'Pengguna Dihapus';
+    user.email = `deleted_${user._id}_${Date.now()}@deleted.invalid`;
+    user.nomor_telepon = null;
+    user.foto_profil = '';
+    user.google_id = null;
+    user.password = null;
+    user.token_version = (user.token_version || 0) + 1;
+    await user.save();
+
+    await User.updateOne({ _id: user._id }, { $unset: { nomor_telepon: 1 } });
 
     // Hapus cookie sesi dari browser
     res.clearCookie('sid', {
+      httpOnly: true,
+      secure: process.env.NODE_ENV === 'production',
+      sameSite: 'lax',
+      path: '/',
+    });
+    res.clearCookie('sid.sig', {
       httpOnly: true,
       secure: process.env.NODE_ENV === 'production',
       sameSite: 'lax',
@@ -791,7 +826,7 @@ const deleteAccount = async (req, res, next) => {
 
     return res.status(200).json({
       success: true,
-      message: 'Akun Anda berhasil dihapus secara permanen.',
+      message: 'Akun berhasil dihapus dan sesi telah diakhiri.',
       data: null,
     });
   } catch (error) {
@@ -801,7 +836,7 @@ const deleteAccount = async (req, res, next) => {
 
 const googleAuth = async (req, res, next) => {
   try {
-    const { credential, role } = req.body;
+    const { credential, role, password } = req.body;
     if (!credential || typeof credential !== 'string') {
       return res.status(400).json({
         success: false,
@@ -812,9 +847,10 @@ const googleAuth = async (req, res, next) => {
 
     const clientId = process.env.GOOGLE_CLIENT_ID;
     if (!clientId) {
-      return res.status(500).json({
+      return res.status(503).json({
         success: false,
-        message: 'Konfigurasi Google Client ID belum disetel pada server.',
+        code: 'SERVICE_UNAVAILABLE',
+        message: 'Layanan autentikasi Google saat ini belum tersedia. Hubungi administrator.',
       });
     }
 
@@ -834,15 +870,29 @@ const googleAuth = async (req, res, next) => {
       });
     }
 
-    if (!payload || !payload.email) {
+    if (!payload || !payload.sub || !payload.email) {
       return res.status(400).json({
         success: false,
-        message: 'Gagal memperoleh informasi email dari akun Google Anda.',
+        code: 'INVALID_PAYLOAD',
+        message: 'Gagal memperoleh data identitas (sub/email) dari akun Google Anda.',
       });
     }
 
+    // Validasi issuer Google resmi
+    const validIssuers = ['accounts.google.com', 'https://accounts.google.com'];
+    if (!validIssuers.includes(payload.iss)) {
+      return res.status(401).json({
+        success: false,
+        code: 'INVALID_ISSUER',
+        message: 'Penerbit token Google tidak valid.',
+      });
+    }
+
+    const googleSub = String(payload.sub);
     const email = payload.email.trim().toLowerCase();
-    let user = await User.findOne({ email }).select('+token_version');
+
+    // 1. Cari pengguna berdasarkan identitas stabil google_id (sub)
+    let user = await User.findOne({ google_id: googleSub }).select('+token_version +password');
 
     if (user) {
       if (user.status === 'suspended') {
@@ -853,11 +903,8 @@ const googleAuth = async (req, res, next) => {
         });
       }
 
+      // Pertahankan role asli dan status, jangan biarkan perubahan role lewat request login
       let shouldSave = false;
-      if (!user.google_id) {
-        user.google_id = payload.sub;
-        shouldSave = true;
-      }
       if (!user.foto_profil && payload.picture) {
         user.foto_profil = payload.picture;
         shouldSave = true;
@@ -879,7 +926,71 @@ const googleAuth = async (req, res, next) => {
       });
     }
 
-    // Pengguna belum terdaftar
+    // 2. Jika belum cocok dengan google_id, cari akun lama berdasarkan email
+    const existingUser = await User.findOne({ email }).select('+token_version +password +google_id');
+    if (existingUser) {
+      if (existingUser.status === 'suspended') {
+        return res.status(403).json({
+          success: false,
+          code: 'ACCOUNT_SUSPENDED',
+          message: 'Akun Anda ditangguhkan.',
+        });
+      }
+
+      // Tolak jika akun sudah terhubung ke google_id yang berbeda (mencegah conflict/takeover)
+      if (existingUser.google_id && existingUser.google_id !== googleSub) {
+        return res.status(409).json({
+          success: false,
+          code: 'ACCOUNT_CONFLICT',
+          message: 'Alamat email ini sudah terhubung dengan akun Google lain.',
+        });
+      }
+
+      // Jika akun lama memiliki kata sandi lokal, wajibkan bukti kepemilikan kata sandi untuk pengaitan
+      if (existingUser.password) {
+        if (!password) {
+          return res.status(200).json({
+            success: true,
+            code: 'NEED_PASSWORD_LINK',
+            message: 'Email ini sudah terdaftar dengan kata sandi. Masukkan kata sandi akun untuk menghubungkan Google.',
+            data: {
+              email,
+              nama: existingUser.nama,
+              foto_profil: payload.picture || '',
+            },
+          });
+        }
+
+        const isMatch = await existingUser.matchPassword(password);
+        if (!isMatch) {
+          return res.status(401).json({
+            success: false,
+            code: 'INVALID_CREDENTIALS',
+            message: 'Kata sandi salah. Verifikasi akun gagal.',
+          });
+        }
+      }
+
+      // Hubungkan akun secara aman setelah bukti kepemilikan terverifikasi
+      existingUser.google_id = googleSub;
+      if (!existingUser.foto_profil && payload.picture) {
+        existingUser.foto_profil = payload.picture;
+      }
+      if (!existingUser.email_verified_at && payload.email_verified) {
+        existingUser.email_verified_at = new Date();
+      }
+      await existingUser.save();
+
+      await createSession(req, res, existingUser._id, existingUser.token_version || 0);
+
+      return res.status(200).json({
+        success: true,
+        message: 'Akun Google berhasil dihubungkan!',
+        data: userDto(existingUser),
+      });
+    }
+
+    // 3. Pengguna baru: Wajib memilih role ('pencari' atau 'pemilik' saja, DILARANG 'admin')
     const validRoles = ['pencari', 'pemilik'];
     if (!role || !validRoles.includes(role)) {
       return res.status(200).json({
@@ -897,9 +1008,9 @@ const googleAuth = async (req, res, next) => {
     user = new User({
       nama: payload.name || 'Pengguna Google',
       email,
-      role,
+      role, // Hanya 'pencari' atau 'pemilik'
       foto_profil: payload.picture || '',
-      google_id: payload.sub,
+      google_id: googleSub,
       email_verified_at: payload.email_verified ? new Date() : null,
     });
     await user.save();

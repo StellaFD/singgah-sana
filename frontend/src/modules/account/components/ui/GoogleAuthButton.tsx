@@ -31,9 +31,8 @@ export function GoogleAuthButton({
 }: GoogleAuthButtonProps) {
   const containerRef = useRef<HTMLDivElement>(null);
   const [loaded, setLoaded] = useState(false);
-  const clientId =
-    process.env.NEXT_PUBLIC_GOOGLE_CLIENT_ID ||
-    "1086096031468-fs5rovnf6sqtha6v4mqj3ud0eqaj7v66.apps.googleusercontent.com";
+  const clientId = (process.env.NEXT_PUBLIC_GOOGLE_CLIENT_ID || "").trim();
+  const isConfigured = Boolean(clientId);
 
   const handleCredential = useCallback(
     (res: { credential?: string }) => {
@@ -47,6 +46,7 @@ export function GoogleAuthButton({
   );
 
   useEffect(() => {
+    if (!isConfigured) return;
     let isMounted = true;
 
     const renderGoogleButton = () => {
@@ -110,6 +110,21 @@ export function GoogleAuthButton({
       : text === "signin_with"
       ? "Masuk dengan Google"
       : "Lanjutkan dengan Google";
+
+  if (!isConfigured) {
+    return (
+      <div className="google-auth-wrapper">
+        <button
+          type="button"
+          disabled
+          className="google-auth-fallback-btn opacity-60 cursor-not-allowed"
+          title="Layanan Google Sign-In belum dikonfigurasi pada server."
+        >
+          <span className="google-btn-text">Layanan Google belum tersedia</span>
+        </button>
+      </div>
+    );
+  }
 
   return (
     <div className="google-auth-wrapper">

@@ -158,15 +158,25 @@ function KosRowAction({
   }
 
   if (kos.status_verifikasi === 'approved') {
+    if (kos.status_publikasi === 'active' && kos.status_moderasi !== 'suspended') {
+      return (
+        <Link
+          className={rowActionClass}
+          href={`/kos/${encodeURIComponent(kos._id)}`}
+          rel="noopener noreferrer"
+          target="_blank"
+        >
+          Lihat
+        </Link>
+      );
+    }
     return (
-      <Link
-        className={rowActionClass}
-        href={`/kos/${encodeURIComponent(kos._id)}`}
-        rel="noopener noreferrer"
-        target="_blank"
+      <span
+        className="text-xs text-slate-400 italic"
+        title="Kos disetujui tetapi tidak tampil di publik (diarsipkan atau disuspend)"
       >
-        Lihat
-      </Link>
+        {kos.status_moderasi === 'suspended' ? 'Disuspend' : 'Diarsipkan'}
+      </span>
     );
   }
 

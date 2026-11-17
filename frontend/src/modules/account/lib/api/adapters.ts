@@ -12,6 +12,8 @@ export interface UserDto {
   email_verified?: boolean;
   email_verified_at?: string | null;
   password_updated_at?: string;
+  has_password?: boolean;
+  is_google?: boolean;
 }
 
 export function mapUser(user: UserDto): User {
@@ -32,6 +34,8 @@ export function mapUser(user: UserDto): User {
     fotoUrl: user.foto_profil || null,
     emailTerverifikasi: Boolean(user.email_verified_at || user.email_verified === true),
     passwordDiperbaruiPada: user.password_updated_at || '',
+    hasPassword: user.has_password !== undefined ? user.has_password : Boolean(user.password_updated_at),
+    isGoogle: Boolean(user.is_google),
   };
 }
 

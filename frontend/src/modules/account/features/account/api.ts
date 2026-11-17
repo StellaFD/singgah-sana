@@ -86,8 +86,8 @@ export const accountApi = {
   changeEmail: (_body: { emailBaru: string; password: string }): Promise<{ emailBaru: string }> =>
     unavailable(),
 
-  deleteAccount: async (body: { password: string }) => {
-    await api.delete('/auth/me', { body: { password: body.password } });
+  deleteAccount: async (body: { password?: string; konfirmasi?: string }) => {
+    await api.delete('/auth/me', { body });
   },
 
   notifications: async (
